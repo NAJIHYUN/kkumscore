@@ -1,0 +1,76 @@
+<!doctype html>
+<!--
+  Copyright (c) 2026 꿈꾸는교회 중고등부 찬양팀
+  All rights reserved.
+-->
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>로그인</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔐</text></svg>">
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="./supabase-config.js"></script>
+  <script defer src="./supabase-client.js"></script>
+  <script defer src="./auth.js"></script>
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section id="authIntro" class="auth-intro">
+      <h1 class="auth-intro-title">
+        꿈꾸는교회 악보함
+      </h1>
+    </section>
+
+    <section id="authStep" class="auth-step hidden">
+      <h1 class="auth-hero">꿈꾸는교회 악보함</h1>
+      <p id="authSub" class="auth-sub">처음 가입한 계정은 관리자 승인 후 이용 가능합니다.</p>
+      <div class="auth-nav-row">
+        <button id="btnBackIntro" class="auth-nav-link" type="button">← 처음으로</button>
+      </div>
+
+      <div id="authFields" class="auth-fields hidden">
+        <label id="lineNickname" class="auth-line">
+          <span>닉네임</span>
+          <input id="authNickname" class="auth-input" type="text" autocomplete="nickname" placeholder="닉네임" maxlength="9" />
+        </label>
+        <label id="lineEmail" class="auth-line">
+          <span>이메일</span>
+          <input id="authEmail" class="auth-input" type="email" autocomplete="email" placeholder="이메일" />
+        </label>
+        <label id="linePassword" class="auth-line">
+          <span>비밀번호</span>
+          <input id="authPassword" class="auth-input" type="password" autocomplete="current-password" placeholder="비밀번호" maxlength="15" />
+        </label>
+        <label id="linePasswordConfirm" class="auth-line">
+          <span>비밀번호 확인</span>
+          <input id="authPasswordConfirm" class="auth-input" type="password" autocomplete="new-password" placeholder="비밀번호 확인" maxlength="15" />
+        </label>
+      </div>
+
+      <div id="authModeActions" class="auth-mode-actions hidden">
+        <button id="btnSubmitSignIn" class="btn primary hidden" type="button">로그인</button>
+        <button id="btnSubmitSignUp" class="btn primary hidden" type="button">회원가입</button>
+        <a id="forgotPasswordLink" class="auth-forgot-link hidden" href="#">비밀번호를 잊으셨나요?</a>
+        <button id="btnSwitchMode" class="auth-switch-link hidden" type="button"></button>
+      </div>
+
+      <div id="authStatus" class="auth-status"></div>
+
+      <details class="auth-contact-accordion">
+        <summary class="auth-contact-title">관리자 문의</summary>
+        <div class="auth-contact-body">
+          <textarea id="contactMessage" class="auth-contact-textarea" rows="4" placeholder="내용을 입력해 주세요."></textarea>
+          <button id="btnContactAdmin" class="btn auth-contact-btn" type="button">문의하기</button>
+        </div>
+      </details>
+    </section>
+  </main>
+
+  <footer id="introActions" class="auth-bottom-actions">
+    <button id="btnEnterSignIn" class="btn primary" type="button">로그인</button>
+    <button id="btnEnterSignUp" class="btn" type="button">회원가입</button>
+  </footer>
+</body>
+</html>

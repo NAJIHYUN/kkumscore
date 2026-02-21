@@ -1,0 +1,10 @@
+updated: 5
+review_needed: 2
+skipped: 295
+
+title	key	confidence
+Upper Room Hillsong Worship	E	low
+내 안에 가장 귀한 것	D	high
+성령이 오셨네	C	medium
+약할 때 강함 되시네	C	medium
+주를 바라보며	D	low

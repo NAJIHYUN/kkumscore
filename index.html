@@ -1,0 +1,196 @@
+<!doctype html>
+<!--
+  Copyright (c) 2026 꿈꾸는교회 중고등부 찬양팀.
+  All rights reserved.
+-->
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>찬양팀 악보함</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
+  <link rel="stylesheet" href="./styles.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="./supabase-config.js"></script>
+  <script defer src="./supabase-client.js"></script>
+  <script defer src="./auth-guard.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body class="index-page">
+  <header class="topbar">
+    <div class="top-main">
+      <div class="brand">
+        <strong>꿈꾸는교회 악보함</strong>
+      </div>
+      <div class="top-actions">
+        <a id="btnLogout" class="link hidden" href="#">로그아웃</a>
+        <a class="link hidden" href="./share.html" title="공유 링크 열기(선택됨 없으면 비어있음)">공유페이지</a>
+      </div>
+    </div>
+    <div class="brand-social">
+      <a class="sub-btn" href="./vault-dreamhigh.html">☁️ 고등부</a>
+      <a class="sub-btn" href="./vault-middle.html">😎 중등부</a>
+      <a class="sub-btn" href="./vault-all.html">📂 기타</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="controls">
+      <div class="search-wrap">
+        <input id="q" class="input" type="text" placeholder="검색 (예: ㅇㅅㄴ / 감사 / 아이자야)" />
+        <button id="btnClearSearch" class="search-clear hidden" type="button" aria-label="검색어 지우기">×</button>
+      </div>
+      <div id="sortDropdown" class="sort-dropdown">
+        <button id="sortTrigger" type="button" class="select sort-trigger" aria-haspopup="listbox" aria-expanded="false">가나다순</button>
+        <div id="sortMenu" class="sort-menu hidden" role="listbox" aria-label="정렬 방식"></div>
+        <select id="sort" class="select native-sort" aria-hidden="true" tabindex="-1">
+          <option value="korean">가나다순</option>
+          <option value="latest">최신순</option>
+        </select>
+      </div>
+      <button id="btnSelectMode" class="btn">선택</button>
+      <button id="btnClearSelected" class="btn hidden" type="button">초기화</button>
+      <button id="btnShareSelected" class="btn primary" disabled>패키지 생성</button>
+      <button id="btnMergeSelected" class="btn" disabled>악보 병합</button>
+      <button id="btnAddFile" class="btn add-fab" type="button" aria-label="악보 추가">악보 추가</button>
+    </section>
+
+    <section id="selectedBar" class="selected-bar selected-bar-collapsed">
+      <div class="selected-head">
+        <div class="selected-title">선택됨</div>
+      </div>
+      <div id="selectedChips" class="chips"></div>
+    </section>
+
+    <section class="table-wrap">
+      <table class="table table-head">
+        <thead>
+          <tr>
+            <th class="col-check"></th>
+            <th class="col-title">곡명</th>
+            <th class="col-artist">아티스트</th>
+            <th class="col-key">Key</th>
+            <th class="col-move">이동</th>
+            <th class="col-act">다운로드</th>
+            <th class="col-act">공유</th>
+          </tr>
+        </thead>
+      </table>
+      <div id="tableScroll" class="table-scroll">
+        <table class="table table-body">
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="scrollIndex" class="scroll-index" aria-hidden="true">
+        <span id="scrollIndexThumb" class="scroll-index-thumb"></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- Preview Modal -->
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <div id="mTitle" class="m-title"></div>
+          <div id="mMeta" class="m-meta"></div>
+        </div>
+        <button class="btn" data-close="1">닫기</button>
+      </div>
+      <div class="modal-body">
+        <button id="mPrevPage" class="preview-nav preview-nav-prev hidden" type="button" aria-label="이전 페이지">‹</button>
+        <button id="mNextPage" class="preview-nav preview-nav-next hidden" type="button" aria-label="다음 페이지">›</button>
+        <img id="mImg" class="preview-img hidden" alt="미리보기" />
+        <div id="mPdfMainWrap" class="pdf-main-wrap hidden">
+          <canvas id="mPdfMain" class="pdf-main-canvas" aria-label="PDF 1페이지 미리보기"></canvas>
+        </div>
+        <div id="mPageStrip" class="page-strip hidden" aria-label="페이지 목록"></div>
+      </div>
+      <div class="modal-foot">
+        <button id="mDownloadPage" class="btn" type="button">페이지 일부 다운로드</button>
+        <a id="mDownload" class="btn primary" download>전체 다운로드</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add File Modal -->
+  <div id="addModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-add="1"></div>
+    <div class="modal-card add-modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="m-title">악보 추가</div>
+          <div class="m-meta">PDF 또는 JPG를 업로드해 목록에 추가합니다.</div>
+        </div>
+        <button class="btn" data-close-add="1">닫기</button>
+      </div>
+      <form id="addFileForm" class="modal-body add-form">
+        <div class="add-form-grid">
+          <label class="add-label">
+            <span>제목</span>
+            <input id="addTitle" class="input" type="text" />
+          </label>
+          <label class="add-label">
+            <span>아티스트</span>
+            <input id="addArtist" class="input" type="text" />
+          </label>
+          <label class="add-label">
+            <span>Key</span>
+            <input id="addKey" class="input" type="text" />
+          </label>
+          <label class="add-label">
+            <span>파일 (PDF/JPG, 이미지 다중 선택 가능)</span>
+            <input id="addFileInput" class="input" type="file" accept="application/pdf,image/*" multiple required />
+          </label>
+        </div>
+      </form>
+      <div class="modal-foot">
+        <button id="btnSubmitAddFile" class="btn primary" type="submit" form="addFileForm">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Package Create Modal -->
+  <div id="packageModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-package="1"></div>
+    <div class="modal-card package-modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="m-title">패키지 생성</div>
+          <div class="m-meta">팀을 선택하고 공유 패키지를 생성합니다.</div>
+        </div>
+        <button id="btnClosePackageModal" class="btn" type="button">닫기</button>
+      </div>
+      <form id="packageForm" class="modal-body package-form">
+        <label class="add-label package-name-line">
+          <span>패키지 이름</span>
+          <input id="packageNameInput" class="input package-name-input" type="text" placeholder="예: 260222 하오리 콘티" required />
+        </label>
+        <div class="add-label package-vault-line">
+          <span>보관함</span>
+          <div class="team-toggle" role="radiogroup" aria-label="패키지 대상">
+            <label class="team-option">
+              <input type="radio" name="packageTeam" value="high" />
+              <span>고등부</span>
+            </label>
+            <label class="team-option">
+              <input type="radio" name="packageTeam" value="middle" />
+              <span>중등부</span>
+            </label>
+            <label class="team-option">
+              <input type="radio" name="packageTeam" value="etc" />
+              <span>기타</span>
+            </label>
+          </div>
+        </div>
+      </form>
+      <div class="modal-foot">
+        <button id="btnSubmitPackage" class="btn primary" type="submit" form="packageForm">생성</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

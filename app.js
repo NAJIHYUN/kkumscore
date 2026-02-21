@@ -1020,7 +1020,7 @@ function resetAddUploadProgress() {
   const percent = $("#addUploadProgressPercent");
   const bar = $("#addUploadProgressBar");
   wrap?.classList.add("hidden");
-  if (text) text.textContent = "업로드 준비";
+  if (text) text.textContent = "업로드 준비 중...";
   if (percent) percent.textContent = "0%";
   if (bar) bar.style.width = "0%";
 }
@@ -1484,6 +1484,14 @@ function toSongRecordPayload(title, artist, key, fileUrl, file) {
   };
 }
 
+function normalizeMetaKey(text = "") {
+  return normalizeForMeta(text).toLowerCase();
+}
+
+function buildSongDupKey(title = "", artist = "", key = "") {
+  return `${normalizeMetaKey(title)}|${normalizeMetaKey(artist)}|${normalizeMetaKey(key)}`;
+}
+
 async function handleAddFileSubmit(e) {
   e.preventDefault();
   if (addUploadInProgress) return;
@@ -1511,6 +1519,27 @@ async function handleAddFileSubmit(e) {
   if (!addableFiles.length) {
     alert("PDF 또는 이미지 파일만 추가할 수 있어요.");
     return;
+  }
+
+  // 중복 체크(제목/아티스트/키 기준)
+  const existingKeySet = new Set(
+    state.songs.map((song) => buildSongDupKey(song.title || "", song.artist || "", song.key || ""))
+  );
+  const candidateDupNames = [];
+  for (const file of addableFiles) {
+    const parsed = parseFilenameMeta(file.name);
+    const autoTitle = parsed.title || getBaseName(file.name);
+    const songTitle = multiple ? autoTitle : (title || autoTitle);
+    const songArtist = multiple ? (parsed.artist || artist) : (artist || parsed.artist || "");
+    const songKey = multiple ? (parsed.key || key) : (key || parsed.key || "");
+    const dupKey = buildSongDupKey(songTitle, songArtist, songKey);
+    if (existingKeySet.has(dupKey)) {
+      candidateDupNames.push(songTitle || file.name);
+    }
+  }
+  if (candidateDupNames.length > 0) {
+    const ok = window.confirm("같은 파일이 이미 존재합니다. 업로드 하시겠습니까?");
+    if (!ok) return;
   }
 
   const submitBtn = getAddSubmitButton();

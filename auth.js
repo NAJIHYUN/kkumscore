@@ -87,6 +87,19 @@ function setupPasswordPeek() {
     } catch {}
   }
 
+  function clearAll() {
+    real = "";
+    pw.dataset.realPassword = "";
+    pw.value = "";
+  }
+
+  function clearIfPending() {
+    if (pw.dataset.clearOnNextFocus === "1") {
+      clearAll();
+      pw.dataset.clearOnNextFocus = "0";
+    }
+  }
+
   pw.addEventListener("keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
 
@@ -121,11 +134,13 @@ function setupPasswordPeek() {
   });
 
   pw.addEventListener("focus", () => {
+    clearIfPending();
     render(true);
     placeCaretEnd();
   });
 
   pw.addEventListener("click", () => {
+    clearIfPending();
     placeCaretEnd();
   });
 
@@ -305,6 +320,9 @@ async function initAuth() {
         error?.message === "Invalid login credentials"
           ? "이메일 또는 비밀번호가 올바르지 않습니다."
           : (error?.message || "로그인에 실패했습니다.");
+      if (pwInput) {
+        pwInput.dataset.clearOnNextFocus = "1";
+      }
       setStatus(loginErrorMessage, true);
       return;
     }

@@ -172,6 +172,15 @@
             <input id="addFileInput" class="input" type="file" accept="application/pdf,image/*" multiple required />
           </label>
         </div>
+                <div id="addUploadProgressWrap" class="upload-progress hidden" aria-live="polite">
+          <div class="upload-progress-head">
+            <span id="addUploadProgressText">업로드 준비 중...</span>
+            <span id="addUploadProgressPercent">0%</span>
+          </div>
+          <div class="upload-progress-track">
+            <div id="addUploadProgressBar" class="upload-progress-bar"></div>
+          </div>
+        </div>
       </form>
       <div class="modal-foot">
         <button id="btnSubmitAddFile" class="btn primary" type="submit" form="addFileForm">추가</button>

@@ -28,6 +28,7 @@ let chipDragState = null;
 let mobileRowDragState = null;
 let mobileTwoFingerScrollY = null;
 let scrollIndexDragState = null;
+let addUploadInProgress = false;
 
 const KOR_INITIALS = [
   "ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"
@@ -999,11 +1000,44 @@ function closeModal() {
 }
 
 function openAddModal() {
+  resetAddUploadProgress();
   $("#addModal").classList.remove("hidden");
 }
 
 function closeAddModal() {
+  if (addUploadInProgress) return;
+  resetAddUploadProgress();
   $("#addModal").classList.add("hidden");
+}
+
+function getAddSubmitButton() {
+  return $("#btnSubmitAddFile");
+}
+
+function resetAddUploadProgress() {
+  const wrap = $("#addUploadProgressWrap");
+  const text = $("#addUploadProgressText");
+  const percent = $("#addUploadProgressPercent");
+  const bar = $("#addUploadProgressBar");
+  wrap?.classList.add("hidden");
+  if (text) text.textContent = "업로드 준비 중...";
+  if (percent) percent.textContent = "0%";
+  if (bar) bar.style.width = "0%";
+}
+
+function setAddUploadProgress(doneBytes, totalBytes, doneFiles, totalFiles) {
+  const wrap = $("#addUploadProgressWrap");
+  const text = $("#addUploadProgressText");
+  const percent = $("#addUploadProgressPercent");
+  const bar = $("#addUploadProgressBar");
+  if (!wrap || !text || !percent || !bar) return;
+  wrap.classList.remove("hidden");
+  const safeTotal = Math.max(1, Number(totalBytes) || 1);
+  const ratio = Math.max(0, Math.min(1, doneBytes / safeTotal));
+  const pct = Math.round(ratio * 100);
+  text.textContent = `업로드 중... (${doneFiles}/${totalFiles})`;
+  percent.textContent = `${pct}%`;
+  bar.style.width = `${pct}%`;
 }
 
 function sanitizeFilename(text) {
@@ -1452,6 +1486,7 @@ function toSongRecordPayload(title, artist, key, fileUrl, file) {
 
 async function handleAddFileSubmit(e) {
   e.preventDefault();
+  if (addUploadInProgress) return;
   const fileInput = $("#addFileInput");
   const title = normalizeForMeta($("#addTitle").value);
   const artist = normalizeForMeta($("#addArtist").value);
@@ -1478,6 +1513,18 @@ async function handleAddFileSubmit(e) {
     return;
   }
 
+  const submitBtn = getAddSubmitButton();
+  const originalSubmitText = submitBtn?.textContent || "추가";
+  const totalBytes = addableFiles.reduce((sum, file) => sum + (file.size || 0), 0);
+  let doneBytes = 0;
+  let doneFiles = 0;
+  addUploadInProgress = true;
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "업로드 중...";
+  }
+  setAddUploadProgress(0, totalBytes, 0, addableFiles.length);
+
   // Supabase 우선 저장 (팀 공용 반영)
   if (window.SB?.isConfigured()) {
     try {
@@ -1486,6 +1533,11 @@ async function handleAddFileSubmit(e) {
       const userId = data?.session?.user?.id;
       if (!userId) {
         alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+        addUploadInProgress = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalSubmitText;
+        }
         return;
       }
 
@@ -1518,16 +1570,29 @@ async function handleAddFileSubmit(e) {
           jpgUrl: row.jpg_url || "",
           createdAt: row.created_at || new Date().toISOString(),
         });
+        doneBytes += file.size || 0;
+        doneFiles += 1;
+        setAddUploadProgress(doneBytes, totalBytes, doneFiles, addableFiles.length);
       }
 
       if (!uploadedSongs.length) {
         alert("업로드 가능한 파일이 없습니다.");
+        addUploadInProgress = false;
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalSubmitText;
+        }
         return;
       }
       state.songs = [...uploadedSongs, ...state.songs];
+      addUploadInProgress = false;
       closeAddModal();
       $("#addFileForm").reset();
       render();
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalSubmitText;
+      }
       return;
     } catch (err) {
       console.error(err);
@@ -1546,11 +1611,19 @@ async function handleAddFileSubmit(e) {
     const localSong = toLocalSong(file, songTitle, songArtist, songKey);
     if (!localSong.pdfUrl && !localSong.jpgUrl) continue;
     addedSongs.push(localSong);
+    doneBytes += file.size || 0;
+    doneFiles += 1;
+    setAddUploadProgress(doneBytes, totalBytes, doneFiles, addableFiles.length);
   }
   state.songs = [...addedSongs, ...state.songs];
+  addUploadInProgress = false;
   closeAddModal();
   $("#addFileForm").reset();
   render();
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalSubmitText;
+  }
 }
 
 function renderPageThumb(container, pageNumber, active, onClick) {

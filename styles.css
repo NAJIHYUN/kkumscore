@@ -70,10 +70,11 @@ a{color:inherit}
   overflow:hidden;
 }
 .index-page .controls,
-.index-page #selectedBar{flex:0 0 auto}
+.index-page #selectedBar{
+  flex:0 0 auto;
+grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr;}
 .index-page .table-wrap{
   flex:1 1 auto;
-  grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr;
   min-height:0;
   display:flex;
   flex-direction:column;

@@ -1358,6 +1358,22 @@ function getBaseName(filename = "") {
   return normalizeForMeta(String(filename).replace(/\.[^.]+$/, ""));
 }
 
+function parseFilenameMeta(filename = "") {
+  // expected: 곡명_아티스트_키.ext
+  const base = getBaseName(filename);
+  if (!base.includes("_")) {
+    return { title: base, artist: "", key: "" };
+  }
+  const parts = base.split("_").map((x) => normalizeForMeta(x)).filter(Boolean);
+  if (parts.length < 3) {
+    return { title: base, artist: "", key: "" };
+  }
+  const key = parts[parts.length - 1] || "";
+  const artist = parts[parts.length - 2] || "";
+  const title = normalizeForMeta(parts.slice(0, -2).join("_"));
+  return { title, artist, key };
+}
+
 function normalizeForMeta(text = "") {
   return String(text || "")
     .normalize("NFC")
@@ -1448,16 +1464,6 @@ async function handleAddFileSubmit(e) {
   }
 
   const multiple = files.length > 1;
-  if (multiple) {
-    const hasNonImage = files.some((file) => {
-      const isImage = /^image\//.test(file.type) || /\.(jpg|jpeg|png|webp)$/i.test(file.name || "");
-      return !isImage;
-    });
-    if (hasNonImage) {
-      alert("다중 선택은 이미지 파일만 가능해요.");
-      return;
-    }
-  }
 
   const addableFiles = [];
   for (const file of files) {
@@ -1485,12 +1491,15 @@ async function handleAddFileSubmit(e) {
 
       const uploadedSongs = [];
       for (const file of addableFiles) {
-        const autoTitle = getBaseName(file.name);
+        const parsed = parseFilenameMeta(file.name);
+        const autoTitle = parsed.title || getBaseName(file.name);
         const songTitle = multiple ? autoTitle : (title || autoTitle);
+        const songArtist = multiple ? (parsed.artist || artist) : (artist || parsed.artist || "");
+        const songKey = multiple ? (parsed.key || key) : (key || parsed.key || "");
         const fileUrl = await uploadSongFileToSupabase(file, userId);
         const payload = {
           owner_id: userId,
-          ...toSongRecordPayload(songTitle, artist, key, fileUrl, file),
+          ...toSongRecordPayload(songTitle, songArtist, songKey, fileUrl, file),
         };
         if (!payload.pdf_url && !payload.jpg_url) continue;
 
@@ -1529,9 +1538,12 @@ async function handleAddFileSubmit(e) {
   // Fallback: 기존 로컬 추가
   const addedSongs = [];
   for (const file of addableFiles) {
-    const autoTitle = getBaseName(file.name);
+    const parsed = parseFilenameMeta(file.name);
+    const autoTitle = parsed.title || getBaseName(file.name);
     const songTitle = multiple ? autoTitle : (title || autoTitle);
-    const localSong = toLocalSong(file, songTitle, artist, key);
+    const songArtist = multiple ? (parsed.artist || artist) : (artist || parsed.artist || "");
+    const songKey = multiple ? (parsed.key || key) : (key || parsed.key || "");
+    const localSong = toLocalSong(file, songTitle, songArtist, songKey);
     if (!localSong.pdfUrl && !localSong.jpgUrl) continue;
     addedSongs.push(localSong);
   }

@@ -1971,6 +1971,25 @@ function mapTeamToVault(team = "") {
   return "all";
 }
 
+async function getCurrentUserNickname() {
+  if (!window.SB?.isConfigured()) return "";
+  try {
+    const client = window.SB.getClient();
+    if (!client) return "";
+    const { data } = await client.auth.getSession();
+    const session = data?.session;
+    if (!session) return "";
+    const nickname = String(
+      session.user?.user_metadata?.nickname ||
+      session.user?.email?.split("@")[0] ||
+      ""
+    ).trim();
+    return nickname;
+  } catch {
+    return "";
+  }
+}
+
 function canCreateVaultByRole(role = "all", vault = "all") {
   const r = String(role || "all").toLowerCase();
   const v = String(vault || "all").toLowerCase();
@@ -2364,6 +2383,10 @@ async function init() {
 
   $("#btnShareSelected").addEventListener("click", async () => {
     if (!state.selectMode || state.selectedIds.length === 0) return;
+    if (!state.myNickname) {
+      const nick = await getCurrentUserNickname();
+      if (nick) state.myNickname = nick;
+    }
     const pkgMeta = await openPackageCreateDialog();
     if (!pkgMeta) return;
     const link = buildShareLinkFromSelected(pkgMeta);

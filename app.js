@@ -9,6 +9,7 @@ const state = {
   filtered: [],
   selectMode: false,
   selectedIds: [], // 순서대로 저장
+  myRole: "all",
 };
 
 const SB_SONGS_TABLE = "songs";
@@ -24,11 +25,13 @@ let previewPartialSelectMode = false;
 let previewSelectedPages = new Set();
 let previewEditMode = false;
 let previewEditDeletePages = new Set();
+let previewEditPageOrder = [];
 let chipDragState = null;
 let mobileRowDragState = null;
 let mobileTwoFingerScrollY = null;
 let scrollIndexDragState = null;
 let addUploadInProgress = false;
+let myInfoPasswordUpdating = false;
 
 const KOR_INITIALS = [
   "ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"
@@ -900,6 +903,7 @@ function openPreview(song) {
   previewSelectedPages = new Set();
   previewEditMode = false;
   previewEditDeletePages = new Set();
+  previewEditPageOrder = [];
   $("#mTitle").textContent = song.title;
   $("#mMeta").textContent = `${song.artist} · ${song.key}키`;
   $("#mEditPanel").classList.add("hidden");
@@ -991,6 +995,7 @@ function closeModal() {
   previewSelectedPages = new Set();
   previewEditMode = false;
   previewEditDeletePages = new Set();
+  previewEditPageOrder = [];
   $("#mEditPanel").classList.add("hidden");
   $("#modal").classList.remove("preview-edit-mode");
   $("#mEditAddPages").value = "";
@@ -1115,6 +1120,9 @@ function enterPreviewEditMode() {
   if (!previewSong) return;
   previewEditMode = true;
   previewEditDeletePages = new Set();
+  if (previewDoc && previewDoc.numPages > 0 && (!previewEditPageOrder.length || previewEditPageOrder.length !== previewDoc.numPages)) {
+    previewEditPageOrder = Array.from({ length: previewDoc.numPages }, (_, i) => i + 1);
+  }
   previewPartialSelectMode = false;
   previewSelectedPages = new Set();
   $("#mEditPanel").classList.remove("hidden");
@@ -1190,7 +1198,14 @@ async function buildEditedPdfFromPreview(song, deletePagesSet, addFiles) {
     if (!res.ok) throw new Error("failed to fetch source pdf");
     const bytes = await res.arrayBuffer();
     const src = await PDFLib.PDFDocument.load(bytes);
-    const keepIndices = src.getPageIndices().filter((idx) => !deletePagesSet.has(idx + 1));
+    const defaultOrder = src.getPageIndices().map((idx) => idx + 1);
+    const sourceOrder = (previewEditPageOrder.length === src.getPageCount())
+      ? previewEditPageOrder
+      : defaultOrder;
+    const keepIndices = sourceOrder
+      .filter((pageNo) => !deletePagesSet.has(pageNo))
+      .map((pageNo) => pageNo - 1)
+      .filter((idx) => idx >= 0 && idx < src.getPageCount());
     if (keepIndices.length) {
       const copied = await out.copyPages(src, keepIndices);
       copied.forEach((p) => out.addPage(p));
@@ -1690,6 +1705,7 @@ async function renderPdfPreview(pdfUrl, session) {
   previewDoc = doc;
   previewPage = 1;
   previewTotalPages = doc.numPages;
+  previewEditPageOrder = Array.from({ length: doc.numPages }, (_, i) => i + 1);
   syncPartialDownloadButton();
   updatePreviewNavButtons();
 
@@ -1727,8 +1743,12 @@ async function renderMainPage(pageNumber, session) {
 function renderThumbStrip(doc, session, slideMode = false) {
   const strip = $("#mPageStrip");
   strip.innerHTML = "";
+  const sourcePageOrder = (!slideMode && previewEditMode && previewEditPageOrder.length === doc.numPages)
+    ? previewEditPageOrder
+    : Array.from({ length: doc.numPages }, (_, i) => i + 1);
 
-  for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
+  for (let idx = 0; idx < sourcePageOrder.length; idx += 1) {
+    const pageNumber = sourcePageOrder[idx];
     const thumb = renderPageThumb(
       strip,
       pageNumber,
@@ -1751,6 +1771,39 @@ function renderThumbStrip(doc, session, slideMode = false) {
         await renderMainPage(pageNumber, session);
       }
     );
+    if (!slideMode && previewEditMode) {
+      thumb.item.draggable = true;
+      thumb.item.addEventListener("dragstart", (e) => {
+        e.dataTransfer?.setData("text/plain", String(pageNumber));
+        e.dataTransfer.effectAllowed = "move";
+        thumb.item.classList.add("dragging");
+      });
+      thumb.item.addEventListener("dragend", () => {
+        thumb.item.classList.remove("dragging");
+        strip.querySelectorAll(".page-thumb-drop-before, .page-thumb-drop-after").forEach((el) => {
+          el.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
+        });
+      });
+      thumb.item.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        const rect = thumb.item.getBoundingClientRect();
+        const after = e.clientX > rect.left + rect.width / 2;
+        thumb.item.classList.toggle("page-thumb-drop-after", after);
+        thumb.item.classList.toggle("page-thumb-drop-before", !after);
+      });
+      thumb.item.addEventListener("dragleave", () => {
+        thumb.item.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
+      });
+      thumb.item.addEventListener("drop", (e) => {
+        e.preventDefault();
+        const dragPage = Number(e.dataTransfer?.getData("text/plain") || "0");
+        const targetPage = pageNumber;
+        const rect = thumb.item.getBoundingClientRect();
+        const insertAfter = e.clientX > rect.left + rect.width / 2;
+        thumb.item.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
+        reorderPreviewEditPages(dragPage, targetPage, insertAfter);
+      });
+    }
     if (slideMode) thumb.item.classList.add("page-slide");
     if (slideMode) {
       const num = thumb.item.querySelector(".page-thumb-num");
@@ -1768,6 +1821,19 @@ function renderThumbStrip(doc, session, slideMode = false) {
   }
   syncPreviewPartialSelectionUI();
   syncPreviewEditSelectionUI();
+}
+
+function reorderPreviewEditPages(dragPage, targetPage, insertAfter) {
+  if (!previewDoc || !previewEditPageOrder.length) return;
+  const from = previewEditPageOrder.indexOf(dragPage);
+  const target = previewEditPageOrder.indexOf(targetPage);
+  if (from < 0 || target < 0 || from === target) return;
+  const [picked] = previewEditPageOrder.splice(from, 1);
+  let to = target;
+  if (from < target) to -= 1;
+  if (insertAfter) to += 1;
+  previewEditPageOrder.splice(to, 0, picked);
+  renderThumbStrip(previewDoc, previewSession, false);
 }
 
 async function renderThumbCanvas(doc, pageNumber, canvas, session, targetWidth = 128) {
@@ -1848,6 +1914,34 @@ function buildShareLinkFromSelected(pkgMeta = {}) {
   // share.html?ids=... 형태로 링크 구성
   const params = new URLSearchParams();
   params.set("ids", state.selectedIds.join(","));
+  const pickedSongs = state.selectedIds
+    .map((id) => state.songs.find((s) => s.id === id))
+    .filter(Boolean)
+    .map((s) => ({
+      id: s.id,
+      title: s.title || "",
+      artist: s.artist || "",
+      key: s.key || "",
+      pdfUrl: s.pdfUrl || "",
+    }))
+    .filter((s) => s.id && s.pdfUrl);
+  if (pickedSongs.length) {
+    try {
+      const json = JSON.stringify(pickedSongs);
+      let binary = "";
+      if (typeof TextEncoder !== "undefined") {
+        const bytes = new TextEncoder().encode(json);
+        bytes.forEach((b) => { binary += String.fromCharCode(b); });
+      } else {
+        // iOS 구버전 호환: UTF-8 바이트 문자열 변환
+        binary = unescape(encodeURIComponent(json));
+      }
+      const payload = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+      params.set("data", payload);
+    } catch (err) {
+      console.warn("share payload encode 실패:", err);
+    }
+  }
   const pkg = String(pkgMeta.pkgName || "").trim();
   const team = String(pkgMeta.team || "").trim();
   if (pkg) params.set("pkg", pkg);
@@ -1861,8 +1955,124 @@ function mapTeamToVault(team = "") {
   return "all";
 }
 
+function canCreateVaultByRole(role = "all", vault = "all") {
+  const r = String(role || "all").toLowerCase();
+  const v = String(vault || "all").toLowerCase();
+  if (r === "admin") return true;
+  if (v === "all") return true;
+  if (v === "high") return r === "high";
+  if (v === "middle") return r === "middle";
+  return false;
+}
+
+function setMyInfoStatus(message = "", isError = false) {
+  const el = $("#myInfoStatus");
+  if (!el) return;
+  el.textContent = message;
+  el.classList.toggle("error", !!isError);
+}
+
+function validateMyInfoPassword(password = "") {
+  const value = String(password || "");
+  if (!value) return "새 비밀번호를 입력해 주세요.";
+  if (value.length < 5 || value.length > 15) return "비밀번호는 5~15자로 입력해 주세요.";
+  if (!/^[A-Za-z0-9!@#]+$/.test(value)) return "비밀번호는 영문/숫자/!@#만 사용할 수 있어요.";
+  return "";
+}
+
+async function initMyInfoModal() {
+  const btnMyInfo = $("#btnMyInfo");
+  const modal = $("#myInfoModal");
+  if (!btnMyInfo || !modal) return;
+  if (!window.SB?.isConfigured()) return;
+  const client = window.SB.getClient();
+  if (!client) return;
+
+  const { data } = await client.auth.getSession();
+  const session = data?.session || null;
+  if (!session) return;
+
+  const nickname = String(
+    session.user?.user_metadata?.nickname ||
+    session.user?.email?.split("@")[0] ||
+    "-"
+  );
+  const email = String(session.user?.email || "-");
+  $("#myInfoNickname").textContent = nickname;
+  $("#myInfoEmail").textContent = email;
+
+  const myPkgLink = $("#btnMyInfoPackages");
+  if (myPkgLink) myPkgLink.href = "./my-packages.html";
+
+  btnMyInfo.classList.remove("hidden");
+
+  if (btnMyInfo.dataset.bound === "1") return;
+  btnMyInfo.dataset.bound = "1";
+
+  const openModal = (e) => {
+    if (e) e.preventDefault();
+    $("#myInfoNewPassword").value = "";
+    $("#myInfoNewPasswordConfirm").value = "";
+    setMyInfoStatus("");
+    modal.classList.remove("hidden");
+  };
+  const closeModal = () => {
+    modal.classList.add("hidden");
+    setMyInfoStatus("");
+  };
+
+  btnMyInfo.addEventListener("click", openModal);
+  modal.addEventListener("click", (e) => {
+    const target = e.target;
+    if (target instanceof HTMLElement && target.hasAttribute("data-close-myinfo")) {
+      closeModal();
+    }
+  });
+
+  $("#btnMyInfoChangePassword")?.addEventListener("click", async () => {
+    if (myInfoPasswordUpdating) return;
+    const pw = String($("#myInfoNewPassword")?.value || "");
+    const pw2 = String($("#myInfoNewPasswordConfirm")?.value || "");
+    const pwErr = validateMyInfoPassword(pw);
+    if (pwErr) {
+      setMyInfoStatus(pwErr, true);
+      return;
+    }
+    if (!pw2) {
+      setMyInfoStatus("비밀번호 확인을 입력해 주세요.", true);
+      return;
+    }
+    if (pw !== pw2) {
+      setMyInfoStatus("비밀번호와 비밀번호 확인이 일치하지 않습니다.", true);
+      return;
+    }
+
+    myInfoPasswordUpdating = true;
+    setMyInfoStatus("비밀번호 변경 중...");
+    try {
+      const { error } = await client.auth.updateUser({ password: pw });
+      if (error) {
+        setMyInfoStatus(error.message || "비밀번호 변경에 실패했습니다.", true);
+        return;
+      }
+      $("#myInfoNewPassword").value = "";
+      $("#myInfoNewPasswordConfirm").value = "";
+      setMyInfoStatus("비밀번호가 변경되었습니다.");
+    } catch (err) {
+      setMyInfoStatus("비밀번호 변경 중 오류가 발생했습니다.", true);
+      console.error(err);
+    } finally {
+      myInfoPasswordUpdating = false;
+    }
+  });
+}
+
 async function savePackageToVault(pkgMeta, link) {
   const vault = mapTeamToVault(pkgMeta?.team || "");
+  if (!canCreateVaultByRole(state.myRole, vault)) {
+    alert("해당 보관함에 패키지를 생성할 권한이 없습니다.");
+    return false;
+  }
   const safeName = String(pkgMeta?.pkgName || "").trim() || "이름 없는 패키지";
   const item = {
     name: safeName,
@@ -1884,12 +2094,16 @@ async function savePackageToVault(pkgMeta, link) {
             name: item.name,
             url: item.url,
           });
-          if (!error) return;
+          if (!error) return true;
           console.error("Supabase 보관함 저장 실패:", error);
+          alert("패키지 저장 권한이 없거나 저장에 실패했습니다.");
+          return false;
         }
       }
     } catch (err) {
       console.error("Supabase 보관함 저장 오류:", err);
+      alert("패키지 저장 중 오류가 발생했습니다.");
+      return false;
     }
   }
 
@@ -1899,8 +2113,10 @@ async function savePackageToVault(pkgMeta, link) {
     const prev = JSON.parse(localStorage.getItem(key) || "[]");
     prev.unshift(item);
     localStorage.setItem(key, JSON.stringify(prev));
+    return true;
   } catch (err) {
     console.error("보관함 저장 실패:", err);
+    return false;
   }
 }
 
@@ -1914,9 +2130,22 @@ function openPackageCreateDialog() {
   if (!modal || !form || !input) return Promise.resolve({ pkgName: "", team: "high" });
 
   return new Promise((resolve) => {
+    const applyRoleRestrictions = () => {
+      teamInputs.forEach((input) => {
+        const vault = mapTeamToVault(input.value);
+        const allowed = canCreateVaultByRole(state.myRole, vault);
+        input.disabled = !allowed;
+        const label = input.closest(".team-option");
+        if (label) label.classList.toggle("is-disabled", !allowed);
+      });
+      const checked = form.querySelector("input[name='packageTeam']:checked");
+      if (checked && checked.disabled) checked.checked = false;
+    };
+
     const updateSubmitState = () => {
       const hasPkgName = input.value.trim().length > 0;
-      const hasTeam = !!form.querySelector("input[name='packageTeam']:checked");
+      const selected = form.querySelector("input[name='packageTeam']:checked");
+      const hasTeam = !!selected && !selected.disabled;
       if (submitBtn) submitBtn.disabled = !(hasPkgName && hasTeam);
     };
 
@@ -1941,6 +2170,11 @@ function openPackageCreateDialog() {
         return;
       }
       if (!team) return;
+      const vault = mapTeamToVault(team);
+      if (!canCreateVaultByRole(state.myRole, vault)) {
+        alert("해당 보관함에 패키지를 생성할 권한이 없습니다.");
+        return;
+      }
       input.setCustomValidity("");
       closeWith({
         pkgName,
@@ -1964,6 +2198,7 @@ function openPackageCreateDialog() {
     teamInputs.forEach((el) => {
       el.checked = false;
     });
+    applyRoleRestrictions();
     updateSubmitState();
     modal.classList.remove("hidden");
     input.focus();
@@ -2000,6 +2235,23 @@ async function init() {
     console.warn("songs.json 로드 실패:", err);
   }
   const remoteSongs = await loadSongsFromSupabase();
+  if (window.SB?.isConfigured()) {
+    try {
+      const client = window.SB.getClient();
+      const { data } = await client.auth.getSession();
+      const userId = data?.session?.user?.id;
+      if (userId) {
+        const { data: profile } = await client
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+        state.myRole = String(profile?.role || "all").toLowerCase();
+      }
+    } catch (err) {
+      console.error("profile role 로드 실패:", err);
+    }
+  }
 
   // id 없으면 생성(안전)
   const baseSongs = songs.map((s, i) => ({
@@ -2083,7 +2335,8 @@ async function init() {
     if (!pkgMeta) return;
     const link = buildShareLinkFromSelected(pkgMeta);
     if (!link) return;
-    await savePackageToVault(pkgMeta, link);
+    const saved = await savePackageToVault(pkgMeta, link);
+    if (!saved) return;
     window.open(link, "_blank");
   });
 
@@ -2196,6 +2449,7 @@ async function init() {
     if (e.key === "Escape") {
       closeModal();
       closeAddModal();
+      $("#myInfoModal")?.classList.add("hidden");
     }
   });
   window.addEventListener("resize", () => {
@@ -2217,6 +2471,9 @@ async function init() {
   render();
   syncMobilePreviewActionLayout();
   updatePreviewNavButtons();
+  initMyInfoModal().catch((err) => {
+    console.error("my info 초기화 실패:", err);
+  });
 }
 
 function buildShareMessage(ids, link) {

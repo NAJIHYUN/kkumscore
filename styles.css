@@ -70,9 +70,7 @@ a{color:inherit}
   overflow:hidden;
 }
 .index-page .controls,
-.index-page #selectedBar{
-  flex:0 0 auto;
-  grid-template-columns: 2.5fr 1fr 1fr 1fr 1fr 1fr 1fr;}
+.index-page #selectedBar{flex:0 0 auto}
 .index-page .table-wrap{
   flex:1 1 auto;
   min-height:0;
@@ -755,6 +753,18 @@ th.col-title{text-align:center}
   line-height:1;
   pointer-events:none;
 }
+.preview-edit-mode .page-thumb[draggable="true"]{
+  cursor:grab;
+}
+.preview-edit-mode .page-thumb.dragging{
+  opacity:.55;
+}
+.preview-edit-mode .page-thumb.page-thumb-drop-before{
+  box-shadow:inset 3px 0 0 #2f80ed;
+}
+.preview-edit-mode .page-thumb.page-thumb-drop-after{
+  box-shadow:inset -3px 0 0 #2f80ed;
+}
 .preview-edit-panel{
   margin-bottom:10px;
   border:1px solid #e5e7ec;
@@ -863,6 +873,36 @@ th.col-title{text-align:center}
 .package-name-input::placeholder{
   color:#bcc3cf;
 }
+.myinfo-value{
+  font-size:18px;
+  font-weight:500;
+  color:#171c26;
+  text-align:center;
+}
+.myinfo-status{
+  min-height:20px;
+  margin-top:8px;
+  font-size:13px;
+  color:#666;
+}
+.myinfo-status.error{
+  color:#d32f2f;
+}
+.myinfo-actions{
+  margin-top:8px;
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+}
+#btnMyInfoPackages{
+  text-decoration:none;
+}
+#myInfoModal .m-title{
+  font-size:20px;
+}
+#myPackagesTitle{
+  font-size:20px;
+}
 .package-vault-line{
   display:grid;
   grid-template-columns:3fr 7fr;
@@ -969,6 +1009,12 @@ th.col-title{text-align:center}
   background:#111;
   border-color:#111;
   color:#fff;
+}
+.team-option.is-disabled span{
+  background:#f3f3f3;
+  border-color:#e3e3e3;
+  color:#a4a4a4;
+  cursor:not-allowed;
 }
 
 /* Share page */
@@ -1110,6 +1156,11 @@ th.col-title{text-align:center}
 .vault-btn-copy{
   color:#444;
   background:#f1f1f1;
+  border:none;
+}
+.vault-btn-share{
+  color:#2f80ed;
+  background:#eaf2ff;
   border:none;
 }
 .vault-btn-delete{

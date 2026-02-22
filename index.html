@@ -26,6 +26,7 @@
       </div>
       <div class="top-actions">
         <a id="btnLogout" class="link hidden" href="#">로그아웃</a>
+        <a id="btnMyInfo" class="link hidden" href="#">나의 정보</a>
         <a class="link hidden" href="./share.html" title="공유 링크 열기(선택됨 없으면 비어있음)">공유페이지</a>
       </div>
     </div>
@@ -51,7 +52,7 @@
         </select>
       </div>
       <button id="btnSelectMode" class="btn">선택</button>
-      <button id="btnClearSelected" class="btn hidden" type="button">초기화</button>
+      <button id="btnClearSelected" class="btn hidden" type="button">선택 초기화</button>
       <button id="btnShareSelected" class="btn primary" disabled>패키지 생성</button>
       <button id="btnMergeSelected" class="btn" disabled>악보 병합</button>
       <button id="btnAddFile" class="btn add-fab" type="button" aria-label="악보 추가">악보 추가</button>
@@ -172,7 +173,7 @@
             <input id="addFileInput" class="input" type="file" accept="application/pdf,image/*" multiple required />
           </label>
         </div>
-                <div id="addUploadProgressWrap" class="upload-progress hidden" aria-live="polite">
+        <div id="addUploadProgressWrap" class="upload-progress hidden" aria-live="polite">
           <div class="upload-progress-head">
             <span id="addUploadProgressText">업로드 준비 중...</span>
             <span id="addUploadProgressPercent">0%</span>
@@ -224,6 +225,43 @@
       </form>
       <div class="modal-foot">
         <button id="btnSubmitPackage" class="btn primary" type="submit" form="packageForm">생성</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- My Info Modal -->
+  <div id="myInfoModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" data-close-myinfo="1"></div>
+    <div class="modal-card package-modal-card">
+      <div class="modal-head">
+        <div>
+          <div class="m-title">나의 정보</div>
+          <div class="m-meta">계정 정보 확인 및 비밀번호 변경</div>
+        </div>
+        <button class="btn" type="button" data-close-myinfo="1">닫기</button>
+      </div>
+      <div class="modal-body package-form myinfo-form">
+        <div class="package-name-line">
+          <span>닉네임</span>
+          <strong id="myInfoNickname" class="myinfo-value">-</strong>
+        </div>
+        <div class="package-name-line">
+          <span>이메일</span>
+          <strong id="myInfoEmail" class="myinfo-value">-</strong>
+        </div>
+        <label class="package-name-line" for="myInfoNewPassword">
+          <span>새 비밀번호</span>
+          <input id="myInfoNewPassword" class="input package-name-input" type="password" placeholder="5~15자 (영문/숫자/!@#)" />
+        </label>
+        <label class="package-name-line" for="myInfoNewPasswordConfirm">
+          <span>비밀번호 확인</span>
+          <input id="myInfoNewPasswordConfirm" class="input package-name-input" type="password" placeholder="비밀번호 확인" />
+        </label>
+        <div id="myInfoStatus" class="myinfo-status"></div>
+        <div class="myinfo-actions">
+          <button id="btnMyInfoChangePassword" class="btn" type="button">비밀번호 변경</button>
+          <a id="btnMyInfoPackages" class="btn primary" href="./vault-all.html">내 패키지 보기</a>
+        </div>
       </div>
     </div>
   </div>

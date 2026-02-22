@@ -68,25 +68,160 @@ function getVaultMetaFromTeam(team = "") {
   return { href: "./vault-all.html", label: "📂 기타" };
 }
 
+function decodeShareSongsPayload(encoded = "") {
+  const text = String(encoded || "").trim();
+  if (!text) return [];
+  try {
+    const b64 = text.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const bin = atob(padded);
+    let json = "";
+    if (typeof TextDecoder !== "undefined") {
+      const bytes = Uint8Array.from(bin, (ch) => ch.charCodeAt(0));
+      json = new TextDecoder().decode(bytes);
+    } else {
+      // iOS 구버전 호환
+      json = decodeURIComponent(escape(bin));
+    }
+    const data = JSON.parse(json);
+    if (!Array.isArray(data)) return [];
+    return data
+      .filter((s) => s && typeof s === "object")
+      .map((s) => ({
+        id: String(s.id || ""),
+        title: String(s.title || ""),
+        artist: String(s.artist || ""),
+        key: String(s.key || ""),
+        pdfUrl: String(s.pdfUrl || ""),
+      }))
+      .filter((s) => s.id && s.pdfUrl);
+  } catch {
+    return [];
+  }
+}
+
+function isUuid(v = "") {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v));
+}
+
+async function loadSongsJsonSafe() {
+  try {
+    const res = await fetch("./songs.json", { cache: "no-store" });
+    if (!res.ok) return [];
+    const rawSongs = await res.json();
+    if (!Array.isArray(rawSongs)) return [];
+    return rawSongs.map((s, i) => ({
+      id: s.id || `song-${String(i + 1).padStart(3, "0")}`,
+      title: s.title || "",
+      artist: s.artist || "",
+      key: s.key || "",
+      pdfUrl: s.pdfUrl || s.file || "",
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function loadSongsFromSupabaseByIds(ids = []) {
+  const targetIds = Array.from(new Set((ids || []).filter((id) => isUuid(id))));
+  if (!targetIds.length) return [];
+  if (!window.SB?.isConfigured()) return [];
+  try {
+    const client = window.SB.getClient();
+    if (!client) return [];
+    const { data, error } = await client
+      .from("songs")
+      .select("id, title, artist, key, pdf_url")
+      .in("id", targetIds);
+    if (error || !Array.isArray(data)) return [];
+    return data.map((row) => ({
+      id: row.id,
+      title: row.title || "",
+      artist: row.artist || "",
+      key: row.key || "",
+      pdfUrl: row.pdf_url || "",
+    })).filter((s) => s.id && s.pdfUrl);
+  } catch {
+    return [];
+  }
+}
+
+async function setupShareTopActions() {
+  const btnLogout = $("#btnLogout");
+  const btnGoIndex = $("#btnGoIndex");
+  const toAuth = () => {
+    const next = "./index.html";
+    location.href = `./auth.html?next=${encodeURIComponent(next)}`;
+  };
+
+  let hasSession = false;
+  let client = null;
+  if (window.SB?.isConfigured()) {
+    client = window.SB.getClient();
+    try {
+      const { data } = await client.auth.getSession();
+      hasSession = !!data?.session;
+    } catch {}
+  }
+
+  if (btnLogout && hasSession && client) {
+    btnLogout.classList.remove("hidden");
+    btnLogout.addEventListener("click", async (e) => {
+      e.preventDefault();
+      if (!confirm("로그아웃 하시겠습니까?")) return;
+      try {
+        await client.auth.signOut();
+      } catch {}
+      toAuth();
+    });
+  }
+
+  if (btnGoIndex) {
+    btnGoIndex.addEventListener("click", async (e) => {
+      e.preventDefault();
+      let isLoggedIn = false;
+      if (window.SB?.isConfigured()) {
+        const c = window.SB.getClient();
+        try {
+          const { data } = await c.auth.getSession();
+          isLoggedIn = !!data?.session;
+        } catch {}
+      }
+      if (!isLoggedIn) {
+        alert("로그인이 필요합니다.");
+        toAuth();
+        return;
+      }
+      location.href = "./index.html";
+    });
+  }
+}
+
 async function init() {
   if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 
-  const res = await fetch("./songs.json", { cache: "no-store" });
-  const rawSongs = await res.json();
-  const songs = rawSongs.map((s, i) => ({
-    id: s.id || `song-${String(i + 1).padStart(3, "0")}`,
-    title: s.title || "",
-    artist: s.artist || "",
-    key: s.key || "",
-    pdfUrl: s.pdfUrl || s.file || "",
-  }));
-
   const url = new URL(location.href);
   const ids = (url.searchParams.get("ids") || "").split(",").map(s => s.trim()).filter(Boolean);
+  const payloadSongs = decodeShareSongsPayload(url.searchParams.get("data") || "");
   const packageName = (url.searchParams.get("pkg") || "").trim();
   const packageTeam = (url.searchParams.get("team") || "").trim();
+  await setupShareTopActions();
+
+  const songsJson = await loadSongsJsonSafe();
+  const songsRemote = await loadSongsFromSupabaseByIds(ids);
+  const songById = new Map();
+  [...songsJson, ...songsRemote, ...payloadSongs].forEach((song) => {
+    if (!song?.id) return;
+    songById.set(song.id, song);
+  });
+
+  const picked = ids.map((id) => songById.get(id)).filter(Boolean);
+  if (!picked.length && payloadSongs.length) {
+    picked.push(...payloadSongs);
+  }
+
   const packageVaultBtn = $("#packageVaultBtn");
   if (packageVaultBtn) {
     const vaultMeta = getVaultMetaFromTeam(packageTeam);
@@ -100,8 +235,6 @@ async function init() {
     const packageNamePreview = $("#packageNamePreview");
     if (packageNamePreview) packageNamePreview.textContent = "닉네임";
   }
-
-  const picked = ids.map(id => songs.find(s => s.id === id)).filter(Boolean);
 
   const list = $("#shareSheets");
   list.innerHTML = "";

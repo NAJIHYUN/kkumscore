@@ -17,7 +17,14 @@
     if (!window.supabase || typeof window.supabase.createClient !== "function") return null;
     if (!window.__sbClient) {
       const { url, anonKey } = getConfig();
-      window.__sbClient = window.supabase.createClient(url, anonKey);
+      window.__sbClient = window.supabase.createClient(url, anonKey, {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+          storageKey: "scorebox-auth",
+        },
+      });
     }
     return window.__sbClient;
   }

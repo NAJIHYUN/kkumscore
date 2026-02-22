@@ -8,7 +8,7 @@
 
 ---
 
-## ✨ 주요 기능
+## 주요 기능
 
 - 악보 목록 검색 (한글 / 영문 / 초성 지원)
 - 악보 선택 및 순서 지정
@@ -19,7 +19,7 @@
 
 ---
 
-## 🛠 기술 스택
+## 기술 스택
 
 - Vanilla HTML / CSS / JS
 - [Supabase](https://supabase.com/) (Auth + Postgres)
@@ -40,7 +40,7 @@
 
 ---
 
-## 🚀 로컬 실행
+## 로컬 실행
 
 브라우저에서:
 
@@ -59,14 +59,14 @@ http://localhost:5500/index.html
 
 ---
 
-## 🔎 권한/정책 요약
+## 권한/정책 요약
 
 - `packages` 삭제 → 본인 생성 항목만 가능 (RLS 적용)
 - 보관함 저장 권한 분리는 `profiles.role` + RLS 확장으로 적용 가능
 
 ---
 
-## 🗂 데이터 형식 (`songs.json`)
+## 데이터 형식 (`songs.json`)
 
 ```json
 {
@@ -82,7 +82,7 @@ http://localhost:5500/index.html
 
 ---
 
-## ✅ 배포 전 체크리스트
+## 배포 전 체크리스트
 
 - `supabase-config.js`에 `service_role` 키가 없는지 확인
 - `songs.json` 경로와 `files/` 파일 누락 여부 확인
@@ -91,6 +91,6 @@ http://localhost:5500/index.html
 
 ---
 
-## 📜 라이선스
+## 라이선스
 
 현재 저장소의 `LICENSE` 파일을 따릅니다.

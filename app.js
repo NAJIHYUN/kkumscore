@@ -1258,7 +1258,6 @@ async function sharePreviewAsImage() {
     // 1) 우선 여러 파일 공유를 직접 시도 (Safari는 canShare가 보수적으로 false를 반환하는 경우가 있음)
     try {
       await navigator.share({
-        title: `${previewSong.title || "악보"} 이미지`,
         files,
       });
       return;
@@ -1271,7 +1270,6 @@ async function sharePreviewAsImage() {
       alert("기기 제한으로 여러 장 동시 공유가 안 되어, 한 장씩 공유합니다.");
       for (let i = 0; i < files.length; i += 1) {
         await navigator.share({
-          title: `${previewSong.title || "악보"} 이미지 (${i + 1}/${files.length})`,
           files: [files[i]],
         });
       }
@@ -1646,6 +1644,10 @@ async function downloadPreviewPdfBySelection() {
     const { blob, selectedPages } = await buildPdfBlobFromPreviewSelection();
     const suffix = getPdfPageSuffix(selectedPages);
     const filename = `${sanitizeFilename(previewSong.title || "score")}${suffix}.pdf`;
+    if (isMobileViewport()) {
+      const shared = await sharePdfBlobMobile(blob, filename, previewSong.title || "PDF");
+      if (shared) return;
+    }
     forceDownloadBlob(blob, filename);
   } catch (err) {
     console.error(err);

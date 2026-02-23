@@ -27,6 +27,8 @@ let previewSelectedPages = new Set();
 let previewEditMode = false;
 let previewEditDeletePages = new Set();
 let previewEditPageOrder = [];
+let previewEditThumbDragState = null;
+let previewEditSuppressClickUntil = 0;
 let chipDragState = null;
 let mobileRowDragState = null;
 let mobileTwoFingerScrollY = null;
@@ -906,7 +908,7 @@ function openPreview(song) {
   previewEditDeletePages = new Set();
   previewEditPageOrder = [];
   $("#mTitle").textContent = song.title;
-  $("#mMeta").textContent = `${song.artist} · ${song.key}키`;
+  $("#mMeta").textContent = buildPreviewMeta(song);
   $("#mEditPanel").classList.add("hidden");
   $("#modal").classList.remove("preview-edit-mode");
   $("#mEditTitle").value = song.title || "";
@@ -997,6 +999,8 @@ function closeModal() {
   previewEditMode = false;
   previewEditDeletePages = new Set();
   previewEditPageOrder = [];
+  previewEditThumbDragState = null;
+  previewEditSuppressClickUntil = 0;
   $("#mEditPanel").classList.add("hidden");
   $("#modal").classList.remove("preview-edit-mode");
   $("#mEditAddPages").value = "";
@@ -1052,6 +1056,21 @@ function sanitizeFilename(text) {
     .trim() || "score";
 }
 
+function getSongUploaderNickname(song = {}) {
+  return String(
+    song?.uploaderNickname ||
+    song?.ownerNickname ||
+    ""
+  ).trim();
+}
+
+function buildPreviewMeta(song = {}) {
+  const title = String(song?.title || "").trim();
+  const key = String(song?.key || "").trim();
+  const uploader = getSongUploaderNickname(song) || "닉네임";
+  return `${title} · ${key}키 (업로더 ${uploader})`;
+}
+
 async function sharePdfBlobMobile(blob, filename, title = "PDF 공유") {
   if (!isMobileViewport() || !navigator.share) return false;
   try {
@@ -1077,6 +1096,198 @@ function forceDownloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+async function downloadZipFromEntries(entries, zipName) {
+  if (!window.JSZip) throw new Error("JSZip not loaded");
+  const zip = new JSZip();
+  for (const entry of entries) {
+    if (!entry?.name || !entry?.blob) continue;
+    zip.file(entry.name, entry.blob);
+  }
+  const out = await zip.generateAsync({ type: "blob" });
+  forceDownloadBlob(out, zipName);
+}
+
+function canvasToBlobAsync(canvas, type = "image/png", quality) {
+  return new Promise((resolve, reject) => {
+    if (!canvas || typeof canvas.toBlob !== "function") {
+      reject(new Error("canvas toBlob not supported"));
+      return;
+    }
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("failed to create blob from canvas"));
+        return;
+      }
+      resolve(blob);
+    }, type, quality);
+  });
+}
+
+async function savePreviewAsImage() {
+  if (!previewSong) return;
+  const base = sanitizeFilename(previewSong.title || "score");
+  const isWeb = !isMobileViewport();
+
+  // 1) JPG 미리보기일 때는 원본 이미지를 저장
+  if (previewSong.jpgUrl && !previewSong.pdfUrl) {
+    try {
+      const res = await fetch(previewSong.jpgUrl, { cache: "no-store" });
+      if (!res.ok) throw new Error("failed to fetch image");
+      const blob = await res.blob();
+      const ext = /^image\/png$/i.test(blob.type) ? "png" : "jpg";
+      if (isWeb) {
+        forceDownloadBlob(blob, `${base}_1.${ext}`);
+        return;
+      }
+      forceDownloadBlob(blob, `${base}.${ext}`);
+      return;
+    } catch (err) {
+      console.error(err);
+      alert("이미지 저장 중 오류가 발생했어요.");
+      return;
+    }
+  }
+
+  // 2) PDF 미리보기면 전체 페이지 또는 선택 페이지를 PNG로 저장
+  try {
+    if (previewDoc) {
+      const selectedPages = getSelectedPdfPagesOrAll();
+      const pages = selectedPages.length
+        ? selectedPages
+        : [Math.min(Math.max(1, previewPage || 1), previewDoc.numPages || 1)];
+      const zipEntries = [];
+      for (const pageNum of pages) {
+        const page = await previewDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        const ctx = canvas.getContext("2d");
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const png = await canvasToBlobAsync(canvas, "image/png");
+        if (isWeb) {
+          const nextNum = zipEntries.length + 1;
+          zipEntries.push({ name: `${base}_${nextNum}.png`, blob: png });
+        } else {
+          forceDownloadBlob(png, `${base}_p${pageNum}.png`);
+        }
+      }
+      if (isWeb) {
+        if (zipEntries.length >= 2) {
+          await downloadZipFromEntries(zipEntries, `${base}.zip`);
+        } else if (zipEntries.length === 1) {
+          const first = zipEntries[0];
+          forceDownloadBlob(first.blob, first.name);
+        }
+      }
+      return;
+    }
+
+    const mainCanvas = $("#mPdfMain");
+    if (mainCanvas && mainCanvas.width > 0 && mainCanvas.height > 0) {
+      const png = await canvasToBlobAsync(mainCanvas, "image/png");
+      forceDownloadBlob(png, `${base}.png`);
+      return;
+    }
+
+    alert("저장할 미리보기가 없습니다.");
+  } catch (err) {
+    console.error(err);
+    alert("이미지 저장 중 오류가 발생했어요.");
+  }
+}
+
+async function buildPreviewImageFiles() {
+  if (!previewSong) return [];
+  const base = sanitizeFilename(previewSong.title || "score");
+  const files = [];
+
+  // JPG 미리보기: 원본 1장
+  if (previewSong.jpgUrl && !previewSong.pdfUrl) {
+    const res = await fetch(previewSong.jpgUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error("failed to fetch image");
+    const blob = await res.blob();
+    const ext = /^image\/png$/i.test(blob.type) ? "png" : "jpg";
+    files.push(new File([blob], `${base}_1.${ext}`, { type: blob.type || `image/${ext}` }));
+    return files;
+  }
+
+  // PDF 미리보기: 선택 페이지(없으면 전체)를 PNG 파일들로
+  if (previewDoc) {
+    const selectedPages = getSelectedPdfPagesOrAll();
+    const pages = selectedPages.length
+      ? selectedPages
+      : [Math.min(Math.max(1, previewPage || 1), previewDoc.numPages || 1)];
+    for (let i = 0; i < pages.length; i += 1) {
+      const pageNum = pages[i];
+      const page = await previewDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 2 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      const ctx = canvas.getContext("2d");
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      const blob = await canvasToBlobAsync(canvas, "image/png");
+      files.push(new File([blob], `${base}_${i + 1}.png`, { type: "image/png" }));
+    }
+    return files;
+  }
+
+  const mainCanvas = $("#mPdfMain");
+  if (mainCanvas && mainCanvas.width > 0 && mainCanvas.height > 0) {
+    const blob = await canvasToBlobAsync(mainCanvas, "image/png");
+    files.push(new File([blob], `${base}_1.png`, { type: "image/png" }));
+  }
+  return files;
+}
+
+async function sharePreviewAsImage() {
+  if (!previewSong) return;
+  try {
+    const files = await buildPreviewImageFiles();
+    if (!files.length) {
+      alert("공유할 이미지가 없습니다.");
+      return;
+    }
+    if (!navigator.share) {
+      const secureHint = window.isSecureContext ? "" : "\n(https 주소에서 다시 시도해 주세요.)";
+      alert(`이 브라우저는 이미지 파일 공유를 지원하지 않습니다.${secureHint}`);
+      return;
+    }
+
+    // 1) 우선 여러 파일 공유를 직접 시도 (Safari는 canShare가 보수적으로 false를 반환하는 경우가 있음)
+    try {
+      await navigator.share({
+        title: `${previewSong.title || "악보"} 이미지`,
+        files,
+      });
+      return;
+    } catch (err) {
+      if (err?.name === "AbortError") return;
+    }
+
+    // 2) 여러 파일이 안 되면 한 장씩 공유 시도
+    if (files.length > 1) {
+      alert("기기 제한으로 여러 장 동시 공유가 안 되어, 한 장씩 공유합니다.");
+      for (let i = 0; i < files.length; i += 1) {
+        await navigator.share({
+          title: `${previewSong.title || "악보"} 이미지 (${i + 1}/${files.length})`,
+          files: [files[i]],
+        });
+      }
+      return;
+    }
+
+    // 3) 파일 공유 자체 미지원
+    const secureHint = window.isSecureContext ? "" : "\n(https 주소에서 다시 시도해 주세요.)";
+    alert(`이 브라우저는 이미지 파일 공유를 지원하지 않습니다.${secureHint}`);
+  } catch (err) {
+    if (err?.name === "AbortError") return;
+    console.error(err);
+    alert("이미지 공유 중 오류가 발생했어요.");
+  }
+}
+
 async function downloadOrSharePdfUrl(pdfUrl, filename) {
   if (!pdfUrl) return;
   if (!isMobileViewport()) return;
@@ -1098,11 +1309,30 @@ async function downloadOrSharePdfUrl(pdfUrl, filename) {
 
 function syncPartialDownloadButton() {
   const partialBtn = $("#mDownloadPage");
+  const downloadBtn = $("#mDownload");
+  const shareBtn = $("#mSharePdf");
+  const saveImageBtn = $("#mSaveImage");
+  const shareImageBtn = $("#mShareImage");
   const canShow = !!previewSong?.pdfUrl && previewTotalPages > 1 && !previewEditMode;
-  const ready = previewPartialSelectMode && previewSelectedPages.size > 0;
+  const canUsePdfActions = !!previewSong?.pdfUrl && !previewEditMode;
+  const isMobile = isMobileViewport();
+  if (!partialBtn) return;
   partialBtn.classList.toggle("hidden", !canShow);
   partialBtn.disabled = !canShow;
-  partialBtn.classList.toggle("ready", ready);
+  partialBtn.classList.toggle("is-selecting", previewPartialSelectMode);
+  partialBtn.textContent = previewPartialSelectMode ? "선택 취소" : "페이지 선택";
+  downloadBtn?.classList.toggle("hidden", !canUsePdfActions);
+  shareBtn?.classList.toggle("hidden", !canUsePdfActions);
+  if (shareBtn) shareBtn.disabled = !canUsePdfActions;
+
+  if (saveImageBtn) {
+    saveImageBtn.classList.toggle("hidden", isMobile);
+    saveImageBtn.textContent = "이미지 저장";
+  }
+  if (shareImageBtn) {
+    shareImageBtn.classList.toggle("hidden", !isMobile);
+    shareImageBtn.textContent = "이미지 공유";
+  }
 }
 
 function syncPreviewEditSelectionUI() {
@@ -1110,24 +1340,32 @@ function syncPreviewEditSelectionUI() {
   if (!strip) return;
   const thumbs = Array.from(strip.querySelectorAll(".page-thumb[data-page]"));
   thumbs.forEach((btn) => {
-    const page = Number(btn.dataset.page);
-    const picked = previewEditDeletePages.has(page);
-    btn.classList.toggle("page-thumb-edit-picked", picked);
-    if (previewEditMode) btn.setAttribute("aria-pressed", picked ? "true" : "false");
+    btn.classList.remove("page-thumb-edit-picked");
+    if (previewEditMode) btn.setAttribute("aria-pressed", "false");
   });
 }
 
 function enterPreviewEditMode() {
   if (!previewSong) return;
+  const modal = $("#modal");
+  const pdfWrap = $("#mPdfMainWrap");
   previewEditMode = true;
   previewEditDeletePages = new Set();
+  previewEditThumbDragState = null;
   if (previewDoc && previewDoc.numPages > 0 && (!previewEditPageOrder.length || previewEditPageOrder.length !== previewDoc.numPages)) {
     previewEditPageOrder = Array.from({ length: previewDoc.numPages }, (_, i) => i + 1);
   }
   previewPartialSelectMode = false;
   previewSelectedPages = new Set();
   $("#mEditPanel").classList.remove("hidden");
-  $("#modal").classList.add("preview-edit-mode");
+  modal?.classList.add("preview-edit-mode");
+  // 편집 모드에서는 본문 1페이지 캔버스를 숨기고 썸네일 편집에 집중
+  pdfWrap?.classList.add("hidden");
+  previewMobileSlideMode = false;
+  modal?.classList.remove("mobile-slide-mode");
+  if (previewDoc) {
+    renderThumbStrip(previewDoc, previewSession, false);
+  }
   $("#mEditTitle").value = previewSong.title || "";
   $("#mEditArtist").value = previewSong.artist || "";
   $("#mEditKey").value = previewSong.key || "";
@@ -1138,11 +1376,26 @@ function enterPreviewEditMode() {
 }
 
 function exitPreviewEditMode() {
+  const modal = $("#modal");
+  const pdfWrap = $("#mPdfMainWrap");
   previewEditMode = false;
   previewEditDeletePages = new Set();
+  previewEditPageOrder = [];
+  previewEditThumbDragState = null;
   $("#mEditPanel").classList.add("hidden");
-  $("#modal").classList.remove("preview-edit-mode");
+  modal?.classList.remove("preview-edit-mode");
   $("#mEditAddPages").value = "";
+  if (previewDoc) {
+    previewMobileSlideMode = isMobileViewport();
+    modal?.classList.toggle("mobile-slide-mode", previewMobileSlideMode);
+    if (previewMobileSlideMode) {
+      pdfWrap?.classList.add("hidden");
+    } else {
+      pdfWrap?.classList.remove("hidden");
+      renderMainPage(previewPage, previewSession).catch(() => {});
+    }
+    renderThumbStrip(previewDoc, previewSession, previewMobileSlideMode);
+  }
   syncPartialDownloadButton();
   syncPreviewEditSelectionUI();
 }
@@ -1190,7 +1443,16 @@ async function uploadEditedPdfBlob(blob, song) {
   }
 }
 
-async function buildEditedPdfFromPreview(song, deletePagesSet, addFiles) {
+function hasPreviewEditOrderChanges() {
+  if (!previewDoc || !previewEditPageOrder.length) return false;
+  if (previewEditPageOrder.length !== previewDoc.numPages) return false;
+  for (let i = 0; i < previewEditPageOrder.length; i += 1) {
+    if (previewEditPageOrder[i] !== i + 1) return true;
+  }
+  return false;
+}
+
+async function buildEditedPdfFromPreview(song, addFiles) {
   if (!window.PDFLib) throw new Error("PDFLib not loaded");
   const out = await PDFLib.PDFDocument.create();
 
@@ -1204,7 +1466,6 @@ async function buildEditedPdfFromPreview(song, deletePagesSet, addFiles) {
       ? previewEditPageOrder
       : defaultOrder;
     const keepIndices = sourceOrder
-      .filter((pageNo) => !deletePagesSet.has(pageNo))
       .map((pageNo) => pageNo - 1)
       .filter((idx) => idx >= 0 && idx < src.getPageCount());
     if (keepIndices.length) {
@@ -1212,15 +1473,13 @@ async function buildEditedPdfFromPreview(song, deletePagesSet, addFiles) {
       copied.forEach((p) => out.addPage(p));
     }
   } else if (song.jpgUrl) {
-    if (!deletePagesSet.has(1)) {
-      const res = await fetch(song.jpgUrl, { cache: "no-store" });
-      if (res.ok) {
-        const bytes = await res.arrayBuffer();
-        const isPng = /\.png$/i.test(song.jpgUrl);
-        const img = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
-        const page = out.addPage([img.width, img.height]);
-        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
-      }
+    const res = await fetch(song.jpgUrl, { cache: "no-store" });
+    if (res.ok) {
+      const bytes = await res.arrayBuffer();
+      const isPng = /\.png$/i.test(song.jpgUrl);
+      const img = isPng ? await out.embedPng(bytes) : await out.embedJpg(bytes);
+      const page = out.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
     }
   }
 
@@ -1257,7 +1516,7 @@ async function applyPreviewEdit() {
     return;
   }
 
-  const hasPageEdit = previewEditDeletePages.size > 0 || addFiles.length > 0;
+  const hasPageEdit = hasPreviewEditOrderChanges() || addFiles.length > 0;
   const prevTitle = previewSong.title;
   previewSong.title = title;
   previewSong.artist = artist;
@@ -1265,7 +1524,7 @@ async function applyPreviewEdit() {
 
   try {
     if (hasPageEdit) {
-      const editedBytes = await buildEditedPdfFromPreview(previewSong, previewEditDeletePages, addFiles);
+      const editedBytes = await buildEditedPdfFromPreview(previewSong, addFiles);
       const editedBlob = new Blob([editedBytes], { type: "application/pdf" });
       const remoteUrl = await uploadEditedPdfBlob(editedBlob, previewSong);
       const localUrl = remoteUrl || URL.createObjectURL(editedBlob);
@@ -1290,7 +1549,7 @@ async function applyPreviewEdit() {
     }
 
     $("#mTitle").textContent = previewSong.title;
-    $("#mMeta").textContent = `${previewSong.artist} · ${previewSong.key}키`;
+    $("#mMeta").textContent = buildPreviewMeta(previewSong);
     render();
     exitPreviewEditMode();
     openPreview(previewSong);
@@ -1314,67 +1573,104 @@ function syncPreviewPartialSelectionUI() {
   syncPartialDownloadButton();
 }
 
-async function handlePreviewPartialDownload() {
-  if (!previewSong?.pdfUrl || !previewDoc) return;
+function getSelectedPdfPagesOrAll() {
+  if (!previewDoc) return [];
+  const total = previewDoc.numPages;
+  if (!previewPartialSelectMode || previewSelectedPages.size === 0) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  return Array.from(previewSelectedPages)
+    .filter((p) => Number.isInteger(p) && p >= 1 && p <= total)
+    .sort((a, b) => a - b);
+}
+
+function getPdfPageSuffix(selectedPages = []) {
+  if (!previewDoc || !selectedPages.length) return "";
+  const total = previewDoc.numPages;
+  if (selectedPages.length === total) return "";
+  if (selectedPages.length === 1) return `_p${selectedPages[0]}`;
+  return "_selected";
+}
+
+async function buildPdfBlobFromPreviewSelection() {
+  if (!previewSong?.pdfUrl) throw new Error("no pdf url");
+  const res = await fetch(previewSong.pdfUrl, { cache: "no-store" });
+  if (!res.ok) throw new Error("failed to fetch pdf");
+  const bytes = await res.arrayBuffer();
+  if (!window.PDFLib) throw new Error("PDFLib not loaded");
+  const src = await PDFLib.PDFDocument.load(bytes);
+  const total = src.getPageCount();
+  const selectedPages = getSelectedPdfPagesOrAll();
+  const effective = selectedPages.length
+    ? selectedPages
+    : Array.from({ length: total }, (_, i) => i + 1);
+  const indices = effective.map((p) => p - 1).filter((idx) => idx >= 0 && idx < total);
+  const isFull = indices.length === total && indices.every((idx, i) => idx === i);
+  if (isFull) {
+    return { blob: new Blob([bytes], { type: "application/pdf" }), selectedPages: effective };
+  }
+  const out = await PDFLib.PDFDocument.create();
+  const pages = await out.copyPages(src, indices);
+  pages.forEach((p) => out.addPage(p));
+  const outBytes = await out.save();
+  return { blob: new Blob([outBytes], { type: "application/pdf" }), selectedPages: effective };
+}
+
+function setPreviewPageSelectMode(enabled) {
   const modal = $("#modal");
-  const btn = $("#mDownloadPage");
-
-  if (!previewPartialSelectMode) {
-    previewPartialSelectMode = true;
+  const next = !!enabled;
+  previewPartialSelectMode = next;
+  if (!next) {
+    previewSelectedPages = new Set();
+  }
+  if (next) {
     modal.classList.add("preview-partial-mode");
-    syncPreviewPartialSelectionUI();
-    return;
+  } else {
+    modal.classList.remove("preview-partial-mode");
   }
+  syncPreviewPartialSelectionUI();
+}
 
-  if (previewSelectedPages.size === 0) {
-    alert("다운로드할 페이지를 선택해 주세요.");
-    return;
-  }
+function togglePreviewPageSelectMode() {
+  if (!previewSong?.pdfUrl || !previewDoc || previewEditMode) return;
+  setPreviewPageSelectMode(!previewPartialSelectMode);
+}
 
+async function downloadPreviewPdfBySelection() {
+  if (!previewSong?.pdfUrl) return;
   if (!window.PDFLib) {
     alert("PDF 병합 라이브러리를 불러오지 못했어요.");
     return;
   }
-
-  const prevText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "다운로드 중...";
-
   try {
-    const res = await fetch(previewSong.pdfUrl, { cache: "no-store" });
-    if (!res.ok) throw new Error("failed to fetch pdf");
-    const bytes = await res.arrayBuffer();
-    const src = await PDFLib.PDFDocument.load(bytes);
-    const out = await PDFLib.PDFDocument.create();
-    const selectedPages = Array.from(previewSelectedPages)
-      .filter((p) => Number.isInteger(p) && p >= 1 && p <= src.getPageCount())
-      .sort((a, b) => a - b);
-
-    if (selectedPages.length === 0) {
-      alert("선택한 페이지를 확인해 주세요.");
-      return;
-    }
-
-    const indices = selectedPages.map((p) => p - 1);
-    const pages = await out.copyPages(src, indices);
-    pages.forEach((page) => out.addPage(page));
-
-    const outBytes = await out.save();
-    const blob = new Blob([outBytes], { type: "application/pdf" });
-    const filename = `${sanitizeFilename(previewSong.title)}_selected.pdf`;
-    const shared = await sharePdfBlobMobile(blob, filename, `${previewSong.title} 선택 페이지`);
-    if (!shared) forceDownloadBlob(blob, filename);
-
-    previewPartialSelectMode = false;
-    previewSelectedPages = new Set();
-    modal.classList.remove("preview-partial-mode");
+    const { blob, selectedPages } = await buildPdfBlobFromPreviewSelection();
+    const suffix = getPdfPageSuffix(selectedPages);
+    const filename = `${sanitizeFilename(previewSong.title || "score")}${suffix}.pdf`;
+    forceDownloadBlob(blob, filename);
   } catch (err) {
     console.error(err);
-    alert("페이지 일부 다운로드 중 오류가 발생했어요.");
-  } finally {
-    btn.textContent = prevText;
-    syncPartialDownloadButton();
-    syncPreviewPartialSelectionUI();
+    alert("PDF 저장 중 오류가 발생했어요.");
+  }
+}
+
+async function sharePreviewPdfBySelection() {
+  if (!previewSong?.pdfUrl) return;
+  if (!window.PDFLib) {
+    alert("PDF 병합 라이브러리를 불러오지 못했어요.");
+    return;
+  }
+  try {
+    const { blob, selectedPages } = await buildPdfBlobFromPreviewSelection();
+    const suffix = getPdfPageSuffix(selectedPages);
+    const filename = `${sanitizeFilename(previewSong.title || "score")}${suffix}.pdf`;
+    const shared = await sharePdfBlobMobile(blob, filename, `${previewSong.title} PDF`);
+    if (!shared) {
+      forceDownloadBlob(blob, filename);
+      alert("공유를 지원하지 않아 PDF를 파일로 저장했어요.");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("PDF 공유 중 오류가 발생했어요.");
   }
 }
 
@@ -1400,6 +1696,7 @@ function toLocalSong(file, title, artist, key) {
     key,
     pdfUrl: isPdf ? url : "",
     jpgUrl: isImage ? url : "",
+    uploaderNickname: String(state.myNickname || "").trim(),
     createdAt: new Date().toISOString(),
   };
 }
@@ -1439,11 +1736,17 @@ async function loadSongsFromSupabase() {
     if (!client) return [];
 
     const { data } = await client.auth.getSession();
-    if (!data?.session?.user?.id) return [];
+    const sessionUserId = data?.session?.user?.id || "";
+    if (!sessionUserId) return [];
+    const sessionNickname = String(
+      data?.session?.user?.user_metadata?.nickname ||
+      data?.session?.user?.email?.split("@")[0] ||
+      ""
+    ).trim();
 
     const { data: rows, error } = await client
       .from(SB_SONGS_TABLE)
-      .select("id, title, artist, key, pdf_url, jpg_url, created_at")
+      .select("id, owner_id, title, artist, key, pdf_url, jpg_url, created_at")
       .order("created_at", { ascending: false });
 
     if (error || !Array.isArray(rows)) return [];
@@ -1454,6 +1757,7 @@ async function loadSongsFromSupabase() {
       key: row.key || "",
       pdfUrl: row.pdf_url || "",
       jpgUrl: row.jpg_url || "",
+      uploaderNickname: row.owner_id === sessionUserId ? sessionNickname : "",
       createdAt: row.created_at || new Date().toISOString(),
     }));
   } catch (err) {
@@ -1620,6 +1924,7 @@ async function handleAddFileSubmit(e) {
           key: row.key || "",
           pdfUrl: row.pdf_url || "",
           jpgUrl: row.jpg_url || "",
+          uploaderNickname: String(state.myNickname || "").trim(),
           createdAt: row.created_at || new Date().toISOString(),
         });
         doneBytes += file.size || 0;
@@ -1769,9 +2074,7 @@ function renderThumbStrip(doc, session, slideMode = false) {
       !slideMode && pageNumber === previewPage,
       async () => {
         if (previewEditMode) {
-          if (previewEditDeletePages.has(pageNumber)) previewEditDeletePages.delete(pageNumber);
-          else previewEditDeletePages.add(pageNumber);
-          syncPreviewEditSelectionUI();
+          // 편집 모드에서는 탭 삭제를 사용하지 않음 (드래그 정렬 전용)
           return;
         }
         if (previewPartialSelectMode) {
@@ -1786,36 +2089,17 @@ function renderThumbStrip(doc, session, slideMode = false) {
       }
     );
     if (!slideMode && previewEditMode) {
-      thumb.item.draggable = true;
-      thumb.item.addEventListener("dragstart", (e) => {
-        e.dataTransfer?.setData("text/plain", String(pageNumber));
-        e.dataTransfer.effectAllowed = "move";
-        thumb.item.classList.add("dragging");
+      thumb.item.addEventListener("pointerdown", (e) => {
+        startPreviewEditThumbDrag(e, pageNumber, thumb.item);
       });
-      thumb.item.addEventListener("dragend", () => {
-        thumb.item.classList.remove("dragging");
-        strip.querySelectorAll(".page-thumb-drop-before, .page-thumb-drop-after").forEach((el) => {
-          el.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
-        });
+      thumb.item.addEventListener("pointermove", (e) => {
+        movePreviewEditThumbDrag(e);
       });
-      thumb.item.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        const rect = thumb.item.getBoundingClientRect();
-        const after = e.clientX > rect.left + rect.width / 2;
-        thumb.item.classList.toggle("page-thumb-drop-after", after);
-        thumb.item.classList.toggle("page-thumb-drop-before", !after);
+      thumb.item.addEventListener("pointerup", (e) => {
+        endPreviewEditThumbDrag(e);
       });
-      thumb.item.addEventListener("dragleave", () => {
-        thumb.item.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
-      });
-      thumb.item.addEventListener("drop", (e) => {
-        e.preventDefault();
-        const dragPage = Number(e.dataTransfer?.getData("text/plain") || "0");
-        const targetPage = pageNumber;
-        const rect = thumb.item.getBoundingClientRect();
-        const insertAfter = e.clientX > rect.left + rect.width / 2;
-        thumb.item.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
-        reorderPreviewEditPages(dragPage, targetPage, insertAfter);
+      thumb.item.addEventListener("pointercancel", (e) => {
+        endPreviewEditThumbDrag(e);
       });
     }
     if (slideMode) thumb.item.classList.add("page-slide");
@@ -1848,6 +2132,95 @@ function reorderPreviewEditPages(dragPage, targetPage, insertAfter) {
   if (insertAfter) to += 1;
   previewEditPageOrder.splice(to, 0, picked);
   renderThumbStrip(previewDoc, previewSession, false);
+}
+
+function clearPreviewEditThumbDropClasses() {
+  const strip = $("#mPageStrip");
+  if (!strip) return;
+  strip.querySelectorAll(".page-thumb-drop-before, .page-thumb-drop-after").forEach((el) => {
+    el.classList.remove("page-thumb-drop-before", "page-thumb-drop-after");
+  });
+}
+
+function getPreviewEditThumbDropTarget(clientX, clientY, dragPage) {
+  const strip = $("#mPageStrip");
+  if (!strip) return null;
+  const hit = document.elementFromPoint(clientX, clientY);
+  const targetEl = hit?.closest(".page-thumb[data-page]");
+  if (!targetEl) return null;
+  const targetPage = Number(targetEl.dataset.page || "0");
+  if (!targetPage || targetPage === dragPage) return null;
+  const rect = targetEl.getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const dy = clientY - centerY;
+  const dx = clientX - centerX;
+  const insertAfter = Math.abs(dy) > Math.abs(dx) ? (dy > 0) : (dx > 0);
+  return { targetEl, targetPage, insertAfter };
+}
+
+function startPreviewEditThumbDrag(e, pageNumber, itemEl) {
+  if (!previewEditMode) return;
+  if (!previewDoc || !previewEditPageOrder.length) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  if (e.pointerType === "touch" && !e.isPrimary) return;
+
+  previewEditThumbDragState = {
+    pointerId: e.pointerId,
+    pageNumber,
+    itemEl,
+    startX: e.clientX,
+    startY: e.clientY,
+    dragging: false,
+  };
+  try {
+    itemEl.setPointerCapture(e.pointerId);
+  } catch {}
+}
+
+function movePreviewEditThumbDrag(e) {
+  if (!previewEditThumbDragState) return;
+  if (previewEditThumbDragState.pointerId !== e.pointerId) return;
+  const state = previewEditThumbDragState;
+  const dx = e.clientX - state.startX;
+  const dy = e.clientY - state.startY;
+  const distance = Math.hypot(dx, dy);
+
+  if (!state.dragging && distance > 8) {
+    state.dragging = true;
+    state.itemEl.classList.add("dragging");
+  }
+  if (!state.dragging) return;
+
+  state.itemEl.style.transform = `translate(${dx}px, ${dy}px) scale(1.03)`;
+  clearPreviewEditThumbDropClasses();
+  const drop = getPreviewEditThumbDropTarget(e.clientX, e.clientY, state.pageNumber);
+  if (drop) {
+    drop.targetEl.classList.add(drop.insertAfter ? "page-thumb-drop-after" : "page-thumb-drop-before");
+  }
+  e.preventDefault();
+}
+
+function endPreviewEditThumbDrag(e) {
+  if (!previewEditThumbDragState) return;
+  if (previewEditThumbDragState.pointerId !== e.pointerId) return;
+  const state = previewEditThumbDragState;
+  const wasDragging = state.dragging;
+  const drop = wasDragging
+    ? getPreviewEditThumbDropTarget(e.clientX, e.clientY, state.pageNumber)
+    : null;
+
+  state.itemEl.classList.remove("dragging");
+  state.itemEl.style.transform = "";
+  clearPreviewEditThumbDropClasses();
+  try {
+    state.itemEl.releasePointerCapture(e.pointerId);
+  } catch {}
+  previewEditThumbDragState = null;
+
+  if (!wasDragging || !drop) return;
+  previewEditSuppressClickUntil = Date.now() + 280;
+  reorderPreviewEditPages(state.pageNumber, drop.targetPage, drop.insertAfter);
 }
 
 async function renderThumbCanvas(doc, pageNumber, canvas, session, targetWidth = 128) {
@@ -2313,6 +2686,7 @@ async function init() {
     key: s.key || "",
     pdfUrl: s.pdfUrl || s.file || "",
     jpgUrl: s.jpgUrl || "",
+    uploaderNickname: s.uploaderNickname || "",
     createdAt: s.createdAt || new Date().toISOString(),
   }));
   const merged = [...remoteSongs, ...baseSongs];
@@ -2467,10 +2841,7 @@ async function init() {
     await renderMainPage(previewPage + 1, session);
   });
   $("#mDownloadPage").addEventListener("click", () => {
-    handlePreviewPartialDownload().catch((err) => {
-      console.error(err);
-      alert("페이지 일부 다운로드 처리 중 오류가 발생했어요.");
-    });
+    togglePreviewPageSelectMode();
   });
   $("#mEditSong").addEventListener("click", () => {
     if (!previewSong) return;
@@ -2490,11 +2861,26 @@ async function init() {
     });
   });
   $("#mDownload").addEventListener("click", async (e) => {
-    if (!isMobileViewport()) return;
     e.preventDefault();
-    if (!previewSong?.pdfUrl) return;
-    const filename = `${sanitizeFilename(previewSong.title || "score")}.pdf`;
-    await downloadOrSharePdfUrl(previewSong.pdfUrl, filename);
+    await downloadPreviewPdfBySelection();
+  });
+  $("#mSharePdf").addEventListener("click", () => {
+    sharePreviewPdfBySelection().catch((err) => {
+      console.error(err);
+      alert("PDF 공유 중 오류가 발생했어요.");
+    });
+  });
+  $("#mSaveImage").addEventListener("click", () => {
+    savePreviewAsImage().catch((err) => {
+      console.error(err);
+      alert("이미지 저장 중 오류가 발생했어요.");
+    });
+  });
+  $("#mShareImage").addEventListener("click", () => {
+    sharePreviewAsImage().catch((err) => {
+      console.error(err);
+      alert("이미지 공유 중 오류가 발생했어요.");
+    });
   });
   $("#addModal").addEventListener("click", (e) => {
     if (e.target?.dataset?.closeAdd) closeAddModal();

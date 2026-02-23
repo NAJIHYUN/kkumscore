@@ -734,6 +734,26 @@ th.col-title{text-align:center}
   filter:brightness(.65);
   box-shadow:inset 0 0 0 999px rgba(209,67,67,.18);
 }
+.preview-edit-mode .page-strip{
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:10px;
+  overflow-x:visible;
+  overflow-y:visible;
+  padding-bottom:0;
+}
+.preview-edit-mode .page-thumb{
+  position:relative;
+  width:auto;
+  max-width:100%;
+  margin:0;
+}
+.preview-edit-mode #mPdfMainWrap{
+  display:none !important;
+}
+.preview-edit-mode .preview-nav{
+  display:none !important;
+}
 .preview-edit-mode .page-thumb.page-thumb-edit-picked::after{
   content:"삭제";
   position:absolute;
@@ -765,6 +785,32 @@ th.col-title{text-align:center}
 .preview-edit-mode .page-thumb.page-thumb-drop-after{
   box-shadow:inset -3px 0 0 #2f80ed;
 }
+.page-thumb-reorder{
+  position:absolute;
+  right:10px;
+  top:10px;
+  display:flex;
+  gap:4px;
+  z-index:3;
+}
+.page-thumb-reorder-btn{
+  width:22px;
+  height:22px;
+  border:none;
+  border-radius:6px;
+  background:rgba(17,17,17,.7);
+  color:#fff;
+  font-size:13px;
+  line-height:1;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.page-thumb-reorder-btn:disabled{
+  opacity:.35;
+  cursor:not-allowed;
+}
 .preview-edit-panel{
   margin-bottom:10px;
   border:1px solid #e5e7ec;
@@ -793,6 +839,9 @@ th.col-title{text-align:center}
   border-color:#2f80ed;
   color:#fff;
 }
+.preview-edit-mode .modal-foot{
+  display:none;
+}
 .page-slide-badge{
   position:absolute;
   left:12px;
@@ -814,16 +863,34 @@ th.col-title{text-align:center}
 .page-thumb-num{display:block;margin-top:6px;font-size:12px;color:#555;text-align:center}
 .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:12px 14px;border-top:1px solid #eee;background:#fff}
 #mDownloadPage{
-  border-color:#2f6ff2;
-  color:#2f6ff2;
+  border-color:#ddd;
+  color:#111;
   background:#fff;
 }
-#mDownloadPage.ready{
-  border-color:#2f6ff2;
-  background:#2f6ff2;
+#mDownloadPage.is-selecting{
+  border-color:#d14343;
+  color:#d14343;
+  background:#fff;
+}
+#mSaveImage{
+  border-color:#0f9f8f;
+  background:#0f9f8f;
+  color:#fff;
+}
+#mShareImage{
+  border-color:#1f3a8a;
+  background:#1f3a8a;
+  color:#fff;
+}
+#mSharePdf{
+  border-color:#111;
+  background:#111;
   color:#fff;
 }
 #mDownload{
+  border-color:#2f6ff2;
+  background:#2f6ff2;
+  color:#fff;
   text-decoration:none;
 }
 .add-modal-card{
@@ -1712,6 +1779,10 @@ th.col-title{text-align:center}
     border:none;
   }
   .modal-head,.modal-foot{padding:10px 12px}
+  .modal-foot{
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
   #modal .btn[data-close]{
     width:48px;
     min-width:48px;
@@ -1745,6 +1816,23 @@ th.col-title{text-align:center}
     padding:0;
     border:none;
     background:transparent;
+  }
+  #modal.preview-edit-mode .page-strip{
+    margin-top:12px;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:10px;
+    overflow-x:visible;
+    overflow-y:visible;
+  }
+  #modal.preview-edit-mode .page-thumb{
+    width:auto;
+    padding:6px;
+    border:1px solid #ddd;
+    background:#fff;
+  }
+  #modal.preview-edit-mode #mPdfMainWrap{
+    display:none !important;
   }
   #modal.mobile-slide-mode .page-thumb-num{display:none}
   .preview-nav{

@@ -16,6 +16,7 @@
   <script defer src="./auth-guard.js"></script>
   <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib/dist/pdf-lib.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script defer src="./app.js"></script>
 </head>
 <body class="index-page">
@@ -122,7 +123,6 @@
               <input id="mEditAddPages" class="input" type="file" accept="application/pdf,image/*" multiple />
             </label>
           </div>
-          <div class="preview-edit-hint">페이지를 눌러 삭제 대상으로 선택할 수 있습니다.</div>
           <div class="preview-edit-actions">
             <button id="mEditCancel" class="btn" type="button">수정 취소</button>
             <button id="mEditApply" class="btn primary" type="button">적용 저장</button>
@@ -136,8 +136,11 @@
       </div>
       <div class="modal-foot">
         <button id="mEditSong" class="btn" type="button">악보 수정</button>
-        <button id="mDownloadPage" class="btn" type="button">페이지 일부 다운로드</button>
-        <a id="mDownload" class="btn primary" download>전체 다운로드</a>
+        <button id="mDownloadPage" class="btn" type="button">페이지 선택</button>
+        <button id="mSaveImage" class="btn" type="button">이미지 저장</button>
+        <button id="mShareImage" class="btn" type="button">이미지 공유</button>
+        <a id="mDownload" class="btn primary" download>PDF 저장</a>
+        <button id="mSharePdf" class="btn" type="button">PDF 공유</button>
       </div>
     </div>
   </div>

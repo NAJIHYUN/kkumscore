@@ -1319,9 +1319,12 @@ function syncPartialDownloadButton() {
   partialBtn.disabled = !canShow;
   partialBtn.classList.toggle("is-selecting", previewPartialSelectMode);
   partialBtn.textContent = previewPartialSelectMode ? "선택 취소" : "페이지 선택";
-  downloadBtn?.classList.toggle("hidden", !canUsePdfActions);
+  downloadBtn?.classList.toggle("hidden", !canUsePdfActions || isMobile);
   shareBtn?.classList.toggle("hidden", !canUsePdfActions);
-  if (shareBtn) shareBtn.disabled = !canUsePdfActions;
+  if (shareBtn) {
+    shareBtn.disabled = !canUsePdfActions;
+    shareBtn.textContent = isMobile ? "PDF 공유(저장)" : "PDF 공유";
+  }
 
   if (saveImageBtn) {
     saveImageBtn.classList.toggle("hidden", isMobile);

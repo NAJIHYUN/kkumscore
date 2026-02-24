@@ -136,10 +136,11 @@ function syncSortOptionsByViewport() {
   if (!sort) return;
   const current = sort.value;
   sort.innerHTML = `
+    <option value="latest">최신순</option>
     <option value="g2a">가-A</option>
     <option value="a2g">A-가</option>
   `;
-  sort.value = current === "a2g" ? "a2g" : "g2a";
+  sort.value = ["latest", "g2a", "a2g"].includes(current) ? current : "g2a";
 }
 
 function renderSortDropdownFromSelect() {

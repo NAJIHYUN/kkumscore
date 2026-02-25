@@ -228,6 +228,68 @@ async function initAuth() {
   const modeActions = $("#authModeActions");
   let authMode = "";
 
+  function isHidden(el) {
+    if (!el) return true;
+    if (el.classList.contains("hidden")) return true;
+    const parentHidden = el.closest(".hidden");
+    return !!parentHidden;
+  }
+
+  function updateEnterKeyHints() {
+    if (!nicknameInput || !emailInput || !pwInput || !pwConfirmInput) return;
+    if (authMode === "signin") {
+      emailInput.enterKeyHint = "next";
+      pwInput.enterKeyHint = "go";
+      return;
+    }
+    if (authMode === "signup") {
+      nicknameInput.enterKeyHint = "next";
+      emailInput.enterKeyHint = "next";
+      pwInput.enterKeyHint = "next";
+      pwConfirmInput.enterKeyHint = "go";
+    }
+  }
+
+  function focusNextVisible(inputs, current) {
+    const currentIndex = inputs.indexOf(current);
+    if (currentIndex < 0) return false;
+    for (let i = currentIndex + 1; i < inputs.length; i += 1) {
+      const next = inputs[i];
+      if (!isHidden(next)) {
+        next.focus();
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function setupInputEnterNavigation() {
+    const signInOrder = [emailInput, pwInput];
+    const signUpOrder = [nicknameInput, emailInput, pwInput, pwConfirmInput];
+    const allInputs = [nicknameInput, emailInput, pwInput, pwConfirmInput].filter(Boolean);
+
+    allInputs.forEach((input) => {
+      input.addEventListener("keydown", (e) => {
+        if (e.key !== "Enter") return;
+        if (isHidden(input)) return;
+
+        const order = authMode === "signup" ? signUpOrder : signInOrder;
+        const moved = focusNextVisible(order, input);
+        if (moved) {
+          e.preventDefault();
+          return;
+        }
+
+        e.preventDefault();
+        if (authMode === "signup") {
+          btnSubmitUp?.click();
+          return;
+        }
+        btnSubmitIn?.click();
+      });
+    });
+  }
+
   function openAuthForm() {
     intro?.classList.add("hidden");
     introActions?.classList.add("hidden");
@@ -266,8 +328,8 @@ async function initAuth() {
     if (emailLabel) emailLabel.textContent = "이메일";
     if (emailInput) {
       emailInput.placeholder = "이메일";
-      emailInput.focus();
     }
+    updateEnterKeyHints();
     setStatus("");
   }
 
@@ -288,7 +350,7 @@ async function initAuth() {
     if (emailInput) {
       emailInput.placeholder = "이메일";
     }
-    nicknameInput?.focus();
+    updateEnterKeyHints();
     setStatus("");
   }
 
@@ -310,6 +372,7 @@ async function initAuth() {
   btnEnterIn?.addEventListener("click", enterLoginMode);
   btnEnterUp?.addEventListener("click", enterSignUpMode);
   btnBackIntro?.addEventListener("click", backToIntro);
+  setupInputEnterNavigation();
   btnSwitchMode?.addEventListener("click", () => {
     if (authMode === "signin") {
       enterSignUpMode();

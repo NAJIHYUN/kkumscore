@@ -1180,10 +1180,11 @@ body[data-my-info] #myInfoRole{
 .myinfo-packages-title{
   display:block;
   margin-top:10px;
-  padding:0 20px 6px;
+  padding:0 20px 10px;
   font-size:16px;
   font-weight:600;
   color:#171c26;
+  text-align:center;
 }
 #myInfoModal #btnMyInfoLogout,
 #myInfoModal #btnMyInfoChangePassword,
@@ -1460,7 +1461,7 @@ body[data-my-info] #myInfoRole{
   align-items:center;
   justify-content:space-between;
   gap:10px;
-  padding:10px 20px;
+  padding:10px 30px;
   border:none;
   border-radius:0;
   background:transparent;
@@ -2589,8 +2590,21 @@ body[data-my-info] #myInfoRole{
   }
   html[data-ui-theme="dark"] .table tbody tr.selected-row td,
   html[data-ui-theme="dark"] .table tbody tr.selected-row.mobile-sticky-row td{
-    background:transparent;
-    box-shadow:none !important;
+    background:#191f28;
+    box-shadow:inset 0 0 0 9999px #191f28 !important;
+    border-top:1px solid #191f28 !important;
+    border-bottom:1px solid #191f28 !important;
+  }
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td,
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td .titlebtn,
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td .artist-sub,
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td .artist-text,
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td .smallbtn,
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td .icon-action{
+    color:#c9e2ff;
+  }
+  html[data-ui-theme="dark"] .table tbody tr.selected-row td .icon-action path{
+    stroke:#c9e2ff;
   }
   html[data-ui-theme="dark"] .table tbody tr.mobile-sticky-row td,
   html[data-ui-theme="dark"] .table tbody tr.mobile-row-dragging td{
@@ -2620,6 +2634,7 @@ body[data-my-info] #myInfoRole{
   }
   html[data-ui-theme="dark"] .titlebtn,
   html[data-ui-theme="dark"] .myinfo-value,
+  html[data-ui-theme="dark"] .myinfo-packages-title,
   html[data-ui-theme="dark"] .mobile-tabbar-item.is-current,
   html[data-ui-theme="dark"] .mobile-tabbar-item.is-current .mobile-tabbar-profile,
   html[data-ui-theme="dark"] .vault-package-name,
@@ -2627,6 +2642,9 @@ body[data-my-info] #myInfoRole{
   html[data-ui-theme="dark"] .brand,
   html[data-ui-theme="dark"] .m-title{
     color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] .vault-title-icon{
+    filter:brightness(0) invert(1);
   }
   html[data-ui-theme="dark"] .artist-text,
   html[data-ui-theme="dark"] .artist-sub,
@@ -2641,6 +2659,11 @@ body[data-my-info] #myInfoRole{
   html[data-ui-theme="dark"] .selected-title,
   html[data-ui-theme="dark"] .page-thumb-num{
     color:#8b95a1;
+  }
+  html[data-ui-theme="dark"] body[data-my-info] #myInfoNickname,
+  html[data-ui-theme="dark"] body[data-my-info] #myInfoEmail,
+  html[data-ui-theme="dark"] body[data-my-info] #myInfoRole{
+    color:#b0b8c1;
   }
   html[data-ui-theme="dark"] .input,
   html[data-ui-theme="dark"] .select,
@@ -2673,16 +2696,40 @@ body[data-my-info] #myInfoRole{
     border-color:#4e5968;
     color:#f2f4f6;
   }
+  html[data-ui-theme="dark"] .team-option.is-disabled span{
+    background:#191f28;
+    border-color:#191f28;
+    color:#4e5968;
+    cursor:not-allowed;
+  }
+  html[data-ui-theme="dark"] .team-option input:checked + span{
+    background:#2272eb;
+    border-color:#2272eb;
+    color:#fff;
+  }
   html[data-ui-theme="dark"] .btn.primary,
   html[data-ui-theme="dark"] #btnShareSelected:not(:disabled),
   html[data-ui-theme="dark"] #btnSubmitAddFile,
   html[data-ui-theme="dark"] #packageModal #btnSubmitPackage:not(:disabled),
-  html[data-ui-theme="dark"] .vault-btn-open,
-  html[data-ui-theme="dark"] .vault-btn-share,
   html[data-ui-theme="dark"] #mSharePdf,
   html[data-ui-theme="dark"] #mShareImage{
     background:#2272eb;
     border-color:#2272eb;
+    color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] .vault-btn-open{
+    background:#1957c2;
+    border-color:#1957c2;
+    color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] .vault-btn-share{
+    background:#3182f6;
+    border-color:#3182f6;
+    color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] #btnShareSelected{
+    background:#4e5968;
+    border-color:#4e5968;
     color:#f9fafb;
   }
   html[data-ui-theme="dark"] #btnMergeSelected:not(:disabled),
@@ -2695,8 +2742,12 @@ body[data-my-info] #myInfoRole{
   }
   html[data-ui-theme="dark"] #btnMyInfoLogout,
   html[data-ui-theme="dark"] .vault-btn-delete{
-    background:#a51926;
-    border-color:#a51926;
+    background:#bc1b2a;
+    border-color:#bc1b2a;
+    color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] #btnClearSelected:disabled{
+    background:#4e5968;
     color:#f9fafb;
   }
   html[data-ui-theme="dark"] #modal .btn[data-close],
@@ -2713,6 +2764,19 @@ body[data-my-info] #myInfoRole{
   html[data-ui-theme="dark"] .mobile-tabbar{
     background:rgba(25,31,40,.98);
     border-top:1px solid #191f28;
+  }
+  html[data-ui-theme="dark"] .scroll-index{
+    background:rgba(25,31,40,.98);
+  }
+  html[data-ui-theme="dark"] .table-wrap::after{
+    background:#020913;
+  }
+  html[data-ui-theme="dark"] .scroll-index-item,
+  html[data-ui-theme="dark"] .scroll-index-hint{
+    color:#d1d6db;
+  }
+  html[data-ui-theme="dark"] .scroll-index-item.current{
+    color:#001936;
   }
   html[data-ui-theme="dark"] .mobile-tabbar-profile{
     color:#8b95a1;
@@ -2739,8 +2803,14 @@ body[data-my-info] #myInfoRole{
   }
   html[data-ui-theme="dark"] .badge,
   html[data-ui-theme="dark"] .page-slide-badge{
-    background:#3182f6;
+    background:#191f28;
     color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] .badge:not(:empty){
+    background:#c9e2ff;
+    border-color:#c9e2ff;
+    color:#171c26;
+    font-weight:600;
   }
   html[data-ui-theme="dark"] .upload-progress-track{
     background:#191f28;

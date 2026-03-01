@@ -7,33 +7,55 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>내 패키지</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+  <title>나의 정보</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👤</text></svg>">
   <link rel="stylesheet" href="./styles.css" />
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./supabase-config.js"></script>
   <script defer src="./supabase-client.js"></script>
   <script defer src="./auth-guard.js"></script>
-  <script defer src="./my-packages.js"></script>
+  <script defer src="./my-info.js"></script>
 </head>
-<body data-my-packages="1">
+<body data-my-info="1">
   <header class="topbar">
     <div class="brand">
-      <strong id="myPackagesTitle">📦 내 패키지</strong>
-      <span class="sub">내가 생성한 패키지 리스트</span>
+      <strong>나의 정보</strong>
+      <span class="sub">계정 정보 및 비밀번호 변경</span>
     </div>
-    <div class="top-actions"><a class="link" href="./index.html">← 악보 목록</a>
+    <div class="top-actions">
+      <a class="link" href="./index.html">← 악보 목록</a>
     </div>
   </header>
+
   <main class="container">
-    <section>
-      <div class="vault-search-wrap">
-        <input id="myPackagesSearch" class="input" type="text" placeholder="검색 (예: 패키지명 / 초성)" />
-        <button id="btnClearMyPackagesSearch" class="vault-search-clear hidden" type="button" aria-label="검색어 전체 삭제">×</button>
+    <section class="myinfo-page-card">
+      <div class="package-form myinfo-form">
+        <div class="package-name-line">
+          <span>닉네임</span>
+          <strong id="myInfoNickname" class="myinfo-value">-</strong>
+        </div>
+        <div class="package-name-line">
+          <span>이메일</span>
+          <strong id="myInfoEmail" class="myinfo-value">-</strong>
+        </div>
+        <label class="package-name-line" for="myInfoNewPassword">
+          <span>새 비밀번호</span>
+          <input id="myInfoNewPassword" class="input package-name-input" type="password" placeholder="5~15자 (영문/숫자/!@#)" />
+        </label>
+        <label class="package-name-line" for="myInfoNewPasswordConfirm">
+          <span>비밀번호 확인</span>
+          <input id="myInfoNewPasswordConfirm" class="input package-name-input" type="password" placeholder="비밀번호 확인" />
+        </label>
+        <div id="myInfoStatus" class="myinfo-status"></div>
+        <div class="myinfo-actions">
+          <button id="btnMyInfoLogout" class="btn" type="button">로그아웃</button>
+          <button id="btnMyInfoChangePassword" class="btn" type="button">비밀번호 변경</button>
+          <a id="btnMyInfoPackages" class="btn primary" href="./my-packages.html">내 패키지 보기</a>
+        </div>
       </div>
-      <div id="myPackagesList" class="vault-list"></div>
     </section>
   </main>
+
   <nav class="mobile-tabbar" aria-label="모바일 네비게이션">
     <a class="mobile-tabbar-item" href="./index.html">
       <span class="mobile-tabbar-icon" aria-hidden="true">
@@ -55,7 +77,7 @@
       <span class="mobile-tabbar-icon" aria-hidden="true"><img class="mobile-tabbar-image mobile-tabbar-image-allvault" src="./assets/allvault.png" alt="" /></span>
       <span class="mobile-tabbar-label">기타</span>
     </a>
-    <a class="mobile-tabbar-item" href="./my-info.html">
+    <a class="mobile-tabbar-item is-current" href="./my-info.html" aria-current="page">
       <span class="mobile-tabbar-icon">
         <svg class="mobile-tabbar-profile" viewBox="0 0 24 24" aria-hidden="true">
           <circle class="mobile-tabbar-profile-head" cx="12" cy="8.8" r="3.4"></circle>

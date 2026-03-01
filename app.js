@@ -34,7 +34,6 @@ let mobileRowDragState = null;
 let mobileTwoFingerScrollY = null;
 let scrollIndexDragState = null;
 let addUploadInProgress = false;
-let myInfoPasswordUpdating = false;
 
 const KOR_INITIALS = [
   "ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"
@@ -2472,26 +2471,9 @@ function canCreateVaultByRole(role = "all", vault = "all") {
   return false;
 }
 
-function setMyInfoStatus(message = "", isError = false) {
-  const el = $("#myInfoStatus");
-  if (!el) return;
-  el.textContent = message;
-  el.classList.toggle("error", !!isError);
-}
-
-function validateMyInfoPassword(password = "") {
-  const value = String(password || "");
-  if (!value) return "새 비밀번호를 입력해 주세요.";
-  if (value.length < 5 || value.length > 15) return "비밀번호는 5~15자로 입력해 주세요.";
-  if (!/^[A-Za-z0-9!@#]+$/.test(value)) return "비밀번호는 영문/숫자/!@#만 사용할 수 있어요.";
-  return "";
-}
-
 async function initMyInfoModal() {
   const btnMyInfo = $("#btnMyInfo");
-  const openTriggers = Array.from(document.querySelectorAll("[data-open-myinfo], #btnMyInfo"));
-  const modal = $("#myInfoModal");
-  if (!btnMyInfo || !modal) return;
+  if (!btnMyInfo) return;
   if (!window.SB?.isConfigured()) return;
   const client = window.SB.getClient();
   if (!client) return;
@@ -2505,95 +2487,9 @@ async function initMyInfoModal() {
     session.user?.email?.split("@")[0] ||
     "-"
   );
-  const email = String(session.user?.email || "-");
   state.myNickname = nickname;
-  $("#myInfoNickname").textContent = nickname;
-  $("#myInfoEmail").textContent = email;
-
-  const myPkgLink = $("#btnMyInfoPackages");
-  if (myPkgLink) myPkgLink.href = "./my-packages.html";
-
-  openTriggers.forEach((el) => el.classList.remove("hidden"));
-
-  if (btnMyInfo.dataset.bound === "1") return;
-  btnMyInfo.dataset.bound = "1";
-
-  const openModal = (e) => {
-    if (e) e.preventDefault();
-    $("#myInfoNewPassword").value = "";
-    $("#myInfoNewPasswordConfirm").value = "";
-    setMyInfoStatus("");
-    modal.classList.remove("hidden");
-    if (location.hash !== "#myinfo") history.replaceState(null, "", "#myinfo");
-  };
-  const closeModal = () => {
-    modal.classList.add("hidden");
-    setMyInfoStatus("");
-    if (location.hash === "#myinfo") history.replaceState(null, "", `${location.pathname}${location.search}`);
-  };
-
-  openTriggers.forEach((el) => {
-    el.addEventListener("click", openModal);
-  });
-  modal.addEventListener("click", (e) => {
-    const target = e.target;
-    const closeTrigger = target instanceof Element
-      ? target.closest("[data-close-myinfo]")
-      : null;
-    if (closeTrigger) {
-      closeModal();
-    }
-  });
-  if (location.hash === "#myinfo") {
-    openModal();
-  }
-
-  $("#btnMyInfoChangePassword")?.addEventListener("click", async () => {
-    if (myInfoPasswordUpdating) return;
-    const pw = String($("#myInfoNewPassword")?.value || "");
-    const pw2 = String($("#myInfoNewPasswordConfirm")?.value || "");
-    const pwErr = validateMyInfoPassword(pw);
-    if (pwErr) {
-      setMyInfoStatus(pwErr, true);
-      return;
-    }
-    if (!pw2) {
-      setMyInfoStatus("비밀번호 확인을 입력해 주세요.", true);
-      return;
-    }
-    if (pw !== pw2) {
-      setMyInfoStatus("비밀번호와 비밀번호 확인이 일치하지 않습니다.", true);
-      return;
-    }
-
-    myInfoPasswordUpdating = true;
-    setMyInfoStatus("비밀번호 변경 중...");
-    try {
-      const { error } = await client.auth.updateUser({ password: pw });
-      if (error) {
-        setMyInfoStatus(error.message || "비밀번호 변경에 실패했습니다.", true);
-        return;
-      }
-      $("#myInfoNewPassword").value = "";
-      $("#myInfoNewPasswordConfirm").value = "";
-      setMyInfoStatus("비밀번호가 변경되었습니다.");
-    } catch (err) {
-      setMyInfoStatus("비밀번호 변경 중 오류가 발생했습니다.", true);
-      console.error(err);
-    } finally {
-      myInfoPasswordUpdating = false;
-    }
-  });
-
-  $("#btnMyInfoLogout")?.addEventListener("click", async () => {
-    const ok = confirm("로그아웃 하시겠습니까?");
-    if (!ok) return;
-    try {
-      await client.auth.signOut();
-    } catch {}
-    const next = `${location.pathname}${location.search}`;
-    location.replace(`./auth.html?next=${encodeURIComponent(next)}`);
-  });
+  btnMyInfo.href = "./my-info.html";
+  btnMyInfo.classList.remove("hidden");
 }
 
 async function savePackageToVault(pkgMeta, link) {

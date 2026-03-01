@@ -24,9 +24,10 @@
       <div class="top-main">
         <div class="brand">
           <strong>꿈꾸는교회 악보함</strong>
+          <button id="btnAddFile" class="btn add-fab" type="button" aria-label="악보 추가">악보 추가</button>
         </div>
         <div class="top-actions">
-          <a id="btnMyInfo" class="my-info-link hidden" href="#" aria-label="나의 정보">
+          <a id="btnMyInfo" class="my-info-link hidden" href="./my-info.html" aria-label="나의 정보">
             <svg class="my-info-icon" viewBox="0 0 24 24" aria-hidden="true">
               <circle class="my-info-ring" cx="12" cy="12" r="8.7"></circle>
               <circle class="my-info-head" cx="12" cy="9.2" r="3.6"></circle>
@@ -62,7 +63,6 @@
       <button id="btnClearSelected" class="btn hidden" type="button">선택 초기화</button>
       <button id="btnShareSelected" class="btn primary" disabled>패키지 생성</button>
       <button id="btnMergeSelected" class="btn" disabled>악보 병합</button>
-      <button id="btnAddFile" class="btn add-fab" type="button" aria-label="악보 추가">악보 추가</button>
     </section>
 
     <section id="selectedBar" class="selected-bar selected-bar-collapsed">
@@ -99,31 +99,34 @@
 
   <nav class="mobile-tabbar" aria-label="모바일 네비게이션">
     <a class="mobile-tabbar-item is-current" href="./index.html" aria-current="page">
-      <span class="mobile-tabbar-icon">⌂</span>
+      <span class="mobile-tabbar-icon" aria-hidden="true">
+        <svg class="mobile-tabbar-home" viewBox="0 0 24 24">
+          <path d="M4.5 10.2 12 4l7.5 6.2V20a1 1 0 0 1-1 1h-4.1v-6.2H9.6V21H5.5a1 1 0 0 1-1-1z"></path>
+        </svg>
+      </span>
       <span class="mobile-tabbar-label">홈</span>
     </a>
     <a class="mobile-tabbar-item" href="./vault-dreamhigh.html">
-      <span class="mobile-tabbar-icon">☁</span>
+      <span class="mobile-tabbar-icon" aria-hidden="true"><img class="mobile-tabbar-image mobile-tabbar-image-high" src="./assets/high.svg" alt="" /></span>
       <span class="mobile-tabbar-label">고등부</span>
     </a>
     <a class="mobile-tabbar-item" href="./vault-middle.html">
-      <span class="mobile-tabbar-icon">☺</span>
+      <span class="mobile-tabbar-icon" aria-hidden="true"><img class="mobile-tabbar-image mobile-tabbar-image-middle" src="./assets/middle.png" alt="" /></span>
       <span class="mobile-tabbar-label">중등부</span>
     </a>
     <a class="mobile-tabbar-item" href="./vault-all.html">
-      <span class="mobile-tabbar-icon">▣</span>
+      <span class="mobile-tabbar-icon" aria-hidden="true"><img class="mobile-tabbar-image mobile-tabbar-image-allvault" src="./assets/allvault.png" alt="" /></span>
       <span class="mobile-tabbar-label">기타</span>
     </a>
-    <button class="mobile-tabbar-item mobile-tabbar-myinfo hidden" type="button" data-open-myinfo="1">
+    <a class="mobile-tabbar-item mobile-tabbar-myinfo" href="./my-info.html">
       <span class="mobile-tabbar-icon">
         <svg class="mobile-tabbar-profile" viewBox="0 0 24 24" aria-hidden="true">
-          <circle class="my-info-ring" cx="12" cy="12" r="8.7"></circle>
-          <circle class="my-info-head" cx="12" cy="9.2" r="3.6"></circle>
-          <path class="my-info-body" d="M5.6 18.45c1.15-2.75 3.78-4.2 6.4-4.2s5.25 1.45 6.4 4.2c-1.48 1.43-3.73 2.35-6.4 2.35s-4.92-.92-6.4-2.35Z"></path>
+          <circle class="mobile-tabbar-profile-head" cx="12" cy="8.8" r="3.4"></circle>
+          <path class="mobile-tabbar-profile-body" d="M5.8 18.6c1.2-2.8 3.9-4.35 6.2-4.35s5 1.55 6.2 4.35c-1.4 1.08-3.63 1.8-6.2 1.8s-4.8-.72-6.2-1.8Z"></path>
         </svg>
       </span>
       <span class="mobile-tabbar-label">나의정보</span>
-    </button>
+    </a>
   </nav>
 
   <!-- Preview Modal -->
@@ -267,47 +270,5 @@
     </div>
   </div>
 
-  <!-- My Info Modal -->
-  <div id="myInfoModal" class="modal hidden" role="dialog" aria-modal="true">
-    <div class="modal-backdrop" data-close-myinfo="1"></div>
-      <div class="modal-card package-modal-card">
-        <div class="modal-head">
-          <div>
-            <div class="m-title">나의 정보</div>
-            <div class="m-meta">계정 정보 및 비밀번호 변경</div>
-          </div>
-          <button class="myinfo-close-btn" type="button" data-close-myinfo="1" aria-label="닫기">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M8 8l8 8M16 8l-8 8"></path>
-            </svg>
-          </button>
-        </div>
-      <div class="modal-body package-form myinfo-form">
-        <div class="package-name-line">
-          <span>닉네임</span>
-          <strong id="myInfoNickname" class="myinfo-value">-</strong>
-        </div>
-        <div class="package-name-line">
-          <span>이메일</span>
-          <strong id="myInfoEmail" class="myinfo-value">-</strong>
-        </div>
-        <label class="package-name-line" for="myInfoNewPassword">
-          <span>새 비밀번호</span>
-          <input id="myInfoNewPassword" class="input package-name-input" type="password" placeholder="5~15자 (영문/숫자/!@#)" />
-        </label>
-        <label class="package-name-line" for="myInfoNewPasswordConfirm">
-          <span>비밀번호 확인</span>
-          <input id="myInfoNewPasswordConfirm" class="input package-name-input" type="password" placeholder="비밀번호 확인" />
-        </label>
-        <div id="myInfoStatus" class="myinfo-status"></div>
-        <div class="myinfo-actions">
-          <button id="btnMyInfoLogout" class="btn" type="button">로그아웃</button>
-          <button id="btnMyInfoChangePassword" class="btn" type="button">비밀번호 변경</button>
-          <a id="btnMyInfoPackages" class="btn primary" href="./vault-all.html">내 패키지 보기</a>
-        </div>
-      </div>
-    </div>
-  </div>
 </body>
 </html>

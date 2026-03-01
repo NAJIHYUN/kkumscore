@@ -131,6 +131,12 @@ function isMobileViewport() {
   return small && (coarse || mobileUA);
 }
 
+function isTouchMobileDevice() {
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+  return coarse || mobileUA;
+}
+
 function syncSortOptionsByViewport() {
   const sort = $("#sort");
   if (!sort) return;
@@ -1097,6 +1103,67 @@ function forceDownloadBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+function loadImageElementFromBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("failed to load image"));
+    };
+    img.src = url;
+  });
+}
+
+async function buildSingleImagePdfBlob(imageUrl) {
+  if (!imageUrl) throw new Error("no image url");
+  if (!window.PDFLib) throw new Error("PDFLib not loaded");
+
+  const res = await fetch(imageUrl, { cache: "no-store" });
+  if (!res.ok) throw new Error("failed to fetch image");
+  const imageBlob = await res.blob();
+  const pdfDoc = await PDFLib.PDFDocument.create();
+  const type = String(imageBlob.type || "").toLowerCase();
+
+  let embeddedImage;
+  let width = 0;
+  let height = 0;
+
+  if (type === "image/png") {
+    const bytes = await imageBlob.arrayBuffer();
+    embeddedImage = await pdfDoc.embedPng(bytes);
+    width = embeddedImage.width;
+    height = embeddedImage.height;
+  } else if (type === "image/jpeg" || type === "image/jpg") {
+    const bytes = await imageBlob.arrayBuffer();
+    embeddedImage = await pdfDoc.embedJpg(bytes);
+    width = embeddedImage.width;
+    height = embeddedImage.height;
+  } else {
+    const img = await loadImageElementFromBlob(imageBlob);
+    width = img.naturalWidth || img.width;
+    height = img.naturalHeight || img.height;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("canvas context not available");
+    ctx.drawImage(img, 0, 0, width, height);
+    const pngBlob = await canvasToBlobAsync(canvas, "image/png");
+    const pngBytes = await pngBlob.arrayBuffer();
+    embeddedImage = await pdfDoc.embedPng(pngBytes);
+  }
+
+  const page = pdfDoc.addPage([width, height]);
+  page.drawImage(embeddedImage, { x: 0, y: 0, width, height });
+  const pdfBytes = await pdfDoc.save();
+  return { blob: new Blob([pdfBytes], { type: "application/pdf" }), selectedPages: [1] };
+}
+
 async function downloadZipFromEntries(entries, zipName) {
   if (!window.JSZip) throw new Error("JSZip not loaded");
   const zip = new JSZip();
@@ -1312,18 +1379,25 @@ function syncPartialDownloadButton() {
   const shareBtn = $("#mSharePdf");
   const saveImageBtn = $("#mSaveImage");
   const shareImageBtn = $("#mShareImage");
+  const hasPreviewSource = !!previewSong?.pdfUrl || !!previewSong?.jpgUrl;
   const canShow = !!previewSong?.pdfUrl && previewTotalPages > 1 && !previewEditMode;
-  const canUsePdfActions = !!previewSong?.pdfUrl && !previewEditMode;
   const isMobile = isMobileViewport();
+  const isTouchMobile = isTouchMobileDevice();
+  const canUsePdfDownload = !!previewSong?.pdfUrl && !previewEditMode;
+  const canUsePdfShare = hasPreviewSource && !previewEditMode && (!!previewSong?.pdfUrl || isMobile);
+  const canUseImageShare = hasPreviewSource && !previewEditMode && isMobile;
   if (!partialBtn) return;
   partialBtn.classList.toggle("hidden", !canShow);
   partialBtn.disabled = !canShow;
   partialBtn.classList.toggle("is-selecting", previewPartialSelectMode);
   partialBtn.textContent = previewPartialSelectMode ? "선택 취소" : "페이지 선택";
-  downloadBtn?.classList.toggle("hidden", !canUsePdfActions || isMobile);
-  shareBtn?.classList.toggle("hidden", !canUsePdfActions);
+  downloadBtn?.classList.toggle("hidden", !canUsePdfDownload || isTouchMobile);
+  if (downloadBtn) {
+    downloadBtn.style.display = (!canUsePdfDownload || isTouchMobile) ? "none" : "";
+  }
+  shareBtn?.classList.toggle("hidden", !canUsePdfShare);
   if (shareBtn) {
-    shareBtn.disabled = !canUsePdfActions;
+    shareBtn.disabled = !canUsePdfShare;
     shareBtn.textContent = isMobile ? "PDF 공유(저장)" : "PDF 공유";
   }
 
@@ -1332,7 +1406,8 @@ function syncPartialDownloadButton() {
     saveImageBtn.textContent = "이미지 저장";
   }
   if (shareImageBtn) {
-    shareImageBtn.classList.toggle("hidden", !isMobile);
+    shareImageBtn.classList.toggle("hidden", !canUseImageShare);
+    shareImageBtn.disabled = !canUseImageShare;
     shareImageBtn.textContent = "이미지 공유";
   }
 }
@@ -1595,27 +1670,32 @@ function getPdfPageSuffix(selectedPages = []) {
 }
 
 async function buildPdfBlobFromPreviewSelection() {
-  if (!previewSong?.pdfUrl) throw new Error("no pdf url");
-  const res = await fetch(previewSong.pdfUrl, { cache: "no-store" });
-  if (!res.ok) throw new Error("failed to fetch pdf");
-  const bytes = await res.arrayBuffer();
   if (!window.PDFLib) throw new Error("PDFLib not loaded");
-  const src = await PDFLib.PDFDocument.load(bytes);
-  const total = src.getPageCount();
-  const selectedPages = getSelectedPdfPagesOrAll();
-  const effective = selectedPages.length
-    ? selectedPages
-    : Array.from({ length: total }, (_, i) => i + 1);
-  const indices = effective.map((p) => p - 1).filter((idx) => idx >= 0 && idx < total);
-  const isFull = indices.length === total && indices.every((idx, i) => idx === i);
-  if (isFull) {
-    return { blob: new Blob([bytes], { type: "application/pdf" }), selectedPages: effective };
+  if (previewSong?.pdfUrl) {
+    const res = await fetch(previewSong.pdfUrl, { cache: "no-store" });
+    if (!res.ok) throw new Error("failed to fetch pdf");
+    const bytes = await res.arrayBuffer();
+    const src = await PDFLib.PDFDocument.load(bytes);
+    const total = src.getPageCount();
+    const selectedPages = getSelectedPdfPagesOrAll();
+    const effective = selectedPages.length
+      ? selectedPages
+      : Array.from({ length: total }, (_, i) => i + 1);
+    const indices = effective.map((p) => p - 1).filter((idx) => idx >= 0 && idx < total);
+    const isFull = indices.length === total && indices.every((idx, i) => idx === i);
+    if (isFull) {
+      return { blob: new Blob([bytes], { type: "application/pdf" }), selectedPages: effective };
+    }
+    const out = await PDFLib.PDFDocument.create();
+    const pages = await out.copyPages(src, indices);
+    pages.forEach((p) => out.addPage(p));
+    const outBytes = await out.save();
+    return { blob: new Blob([outBytes], { type: "application/pdf" }), selectedPages: effective };
   }
-  const out = await PDFLib.PDFDocument.create();
-  const pages = await out.copyPages(src, indices);
-  pages.forEach((p) => out.addPage(p));
-  const outBytes = await out.save();
-  return { blob: new Blob([outBytes], { type: "application/pdf" }), selectedPages: effective };
+  if (previewSong?.jpgUrl) {
+    return await buildSingleImagePdfBlob(previewSong.jpgUrl);
+  }
+  throw new Error("no preview source");
 }
 
 function setPreviewPageSelectMode(enabled) {
@@ -1639,7 +1719,7 @@ function togglePreviewPageSelectMode() {
 }
 
 async function downloadPreviewPdfBySelection() {
-  if (!previewSong?.pdfUrl) return;
+  if (!previewSong?.pdfUrl && !previewSong?.jpgUrl) return;
   if (!window.PDFLib) {
     alert("PDF 병합 라이브러리를 불러오지 못했어요.");
     return;
@@ -1660,7 +1740,7 @@ async function downloadPreviewPdfBySelection() {
 }
 
 async function sharePreviewPdfBySelection() {
-  if (!previewSong?.pdfUrl) return;
+  if (!previewSong?.pdfUrl && !previewSong?.jpgUrl) return;
   if (!window.PDFLib) {
     alert("PDF 병합 라이브러리를 불러오지 못했어요.");
     return;
@@ -1995,9 +2075,10 @@ async function handleAddFileSubmit(e) {
   }
 }
 
-function renderPageThumb(container, pageNumber, active, onClick) {
-  const item = document.createElement("button");
-  item.type = "button";
+function renderPageThumb(container, pageNumber, active, onClick, options = {}) {
+  const { slideMode = false } = options;
+  const item = document.createElement(slideMode ? "div" : "button");
+  if (!slideMode) item.type = "button";
   item.className = `page-thumb${active ? " active" : ""}`;
   item.dataset.page = String(pageNumber);
 
@@ -2006,15 +2087,21 @@ function renderPageThumb(container, pageNumber, active, onClick) {
   canvas.width = 128;
   canvas.height = 180;
 
+  const image = document.createElement("img");
+  image.className = "page-thumb-image hidden";
+  image.alt = `${pageNumber}페이지 미리보기`;
+  image.loading = "lazy";
+  image.decoding = "async";
+
   const num = document.createElement("span");
   num.className = "page-thumb-num";
   num.textContent = `${pageNumber}p`;
 
-  item.append(canvas, num);
-  item.addEventListener("click", onClick);
+  item.append(canvas, image, num);
+  if (typeof onClick === "function") item.addEventListener("click", onClick);
 
   container.appendChild(item);
-  return { item, canvas };
+  return { item, canvas, image };
 }
 
 async function renderPdfPreview(pdfUrl, session) {
@@ -2092,7 +2179,8 @@ function renderThumbStrip(doc, session, slideMode = false) {
         if (slideMode) return;
         if (session !== previewSession) return;
         await renderMainPage(pageNumber, session);
-      }
+      },
+      { slideMode }
     );
     if (!slideMode && previewEditMode) {
       thumb.item.addEventListener("pointerdown", (e) => {
@@ -2110,6 +2198,8 @@ function renderThumbStrip(doc, session, slideMode = false) {
     }
     if (slideMode) thumb.item.classList.add("page-slide");
     if (slideMode) {
+      thumb.canvas.classList.add("hidden");
+      thumb.image.classList.remove("hidden");
       const num = thumb.item.querySelector(".page-thumb-num");
       if (num) num.classList.add("hidden");
       const badge = document.createElement("span");
@@ -2119,9 +2209,9 @@ function renderThumbStrip(doc, session, slideMode = false) {
     }
 
     const targetWidth = slideMode
-      ? Math.max(220, Math.floor(window.innerWidth * 0.72))
+      ? Math.min(Math.max(900, Math.floor(window.innerWidth * (window.devicePixelRatio || 1))), 1400)
       : 128;
-    renderThumbCanvas(doc, pageNumber, thumb.canvas, session, targetWidth);
+    renderThumbCanvas(doc, pageNumber, thumb.canvas, session, targetWidth, thumb.image);
   }
   syncPreviewPartialSelectionUI();
   syncPreviewEditSelectionUI();
@@ -2229,7 +2319,7 @@ function endPreviewEditThumbDrag(e) {
   reorderPreviewEditPages(state.pageNumber, drop.targetPage, drop.insertAfter);
 }
 
-async function renderThumbCanvas(doc, pageNumber, canvas, session, targetWidth = 128) {
+async function renderThumbCanvas(doc, pageNumber, canvas, session, targetWidth = 128, imageEl = null) {
   const page = await doc.getPage(pageNumber);
   if (session !== previewSession) return;
   const baseViewport = page.getViewport({ scale: 1 });
@@ -2240,6 +2330,9 @@ async function renderThumbCanvas(doc, pageNumber, canvas, session, targetWidth =
   canvas.height = Math.floor(viewport.height);
   const ctx = canvas.getContext("2d");
   await page.render({ canvasContext: ctx, viewport }).promise;
+  if (imageEl) {
+    imageEl.src = canvas.toDataURL("image/png");
+  }
 }
 
 function syncPreviewThumbActive() {
@@ -2396,6 +2489,7 @@ function validateMyInfoPassword(password = "") {
 
 async function initMyInfoModal() {
   const btnMyInfo = $("#btnMyInfo");
+  const openTriggers = Array.from(document.querySelectorAll("[data-open-myinfo], #btnMyInfo"));
   const modal = $("#myInfoModal");
   if (!btnMyInfo || !modal) return;
   if (!window.SB?.isConfigured()) return;
@@ -2419,7 +2513,7 @@ async function initMyInfoModal() {
   const myPkgLink = $("#btnMyInfoPackages");
   if (myPkgLink) myPkgLink.href = "./my-packages.html";
 
-  btnMyInfo.classList.remove("hidden");
+  openTriggers.forEach((el) => el.classList.remove("hidden"));
 
   if (btnMyInfo.dataset.bound === "1") return;
   btnMyInfo.dataset.bound = "1";
@@ -2430,19 +2524,29 @@ async function initMyInfoModal() {
     $("#myInfoNewPasswordConfirm").value = "";
     setMyInfoStatus("");
     modal.classList.remove("hidden");
+    if (location.hash !== "#myinfo") history.replaceState(null, "", "#myinfo");
   };
   const closeModal = () => {
     modal.classList.add("hidden");
     setMyInfoStatus("");
+    if (location.hash === "#myinfo") history.replaceState(null, "", `${location.pathname}${location.search}`);
   };
 
-  btnMyInfo.addEventListener("click", openModal);
+  openTriggers.forEach((el) => {
+    el.addEventListener("click", openModal);
+  });
   modal.addEventListener("click", (e) => {
     const target = e.target;
-    if (target instanceof HTMLElement && target.hasAttribute("data-close-myinfo")) {
+    const closeTrigger = target instanceof Element
+      ? target.closest("[data-close-myinfo]")
+      : null;
+    if (closeTrigger) {
       closeModal();
     }
   });
+  if (location.hash === "#myinfo") {
+    openModal();
+  }
 
   $("#btnMyInfoChangePassword")?.addEventListener("click", async () => {
     if (myInfoPasswordUpdating) return;

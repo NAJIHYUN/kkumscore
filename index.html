@@ -21,15 +21,22 @@
 </head>
 <body class="index-page">
   <header class="topbar">
-    <div class="top-main">
-      <div class="brand">
-        <strong>꿈꾸는교회 악보함</strong>
+      <div class="top-main">
+        <div class="brand">
+          <strong>꿈꾸는교회 악보함</strong>
+        </div>
+        <div class="top-actions">
+          <a id="btnMyInfo" class="my-info-link hidden" href="#" aria-label="나의 정보">
+            <svg class="my-info-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle class="my-info-ring" cx="12" cy="12" r="8.7"></circle>
+              <circle class="my-info-head" cx="12" cy="9.2" r="3.6"></circle>
+              <path class="my-info-body" d="M5.6 18.45c1.15-2.75 3.78-4.2 6.4-4.2s5.25 1.45 6.4 4.2c-1.48 1.43-3.73 2.35-6.4 2.35s-4.92-.92-6.4-2.35Z"></path>
+            </svg>
+            <span class="sr-only">나의 정보</span>
+          </a>
+          <a class="link hidden" href="./share.html" title="공유 링크 열기(선택됨 없으면 비어있음)">공유페이지</a>
+        </div>
       </div>
-      <div class="top-actions">
-        <a id="btnMyInfo" class="link hidden" href="#">나의 정보</a>
-        <a class="link hidden" href="./share.html" title="공유 링크 열기(선택됨 없으면 비어있음)">공유페이지</a>
-      </div>
-    </div>
     <div class="brand-social">
       <a class="sub-btn" href="./vault-dreamhigh.html">☁️ 고등부</a>
       <a class="sub-btn" href="./vault-middle.html">😎 중등부</a>
@@ -89,6 +96,35 @@
       </div>
     </section>
   </main>
+
+  <nav class="mobile-tabbar" aria-label="모바일 네비게이션">
+    <a class="mobile-tabbar-item is-current" href="./index.html" aria-current="page">
+      <span class="mobile-tabbar-icon">⌂</span>
+      <span class="mobile-tabbar-label">홈</span>
+    </a>
+    <a class="mobile-tabbar-item" href="./vault-dreamhigh.html">
+      <span class="mobile-tabbar-icon">☁</span>
+      <span class="mobile-tabbar-label">고등부</span>
+    </a>
+    <a class="mobile-tabbar-item" href="./vault-middle.html">
+      <span class="mobile-tabbar-icon">☺</span>
+      <span class="mobile-tabbar-label">중등부</span>
+    </a>
+    <a class="mobile-tabbar-item" href="./vault-all.html">
+      <span class="mobile-tabbar-icon">▣</span>
+      <span class="mobile-tabbar-label">기타</span>
+    </a>
+    <button class="mobile-tabbar-item mobile-tabbar-myinfo hidden" type="button" data-open-myinfo="1">
+      <span class="mobile-tabbar-icon">
+        <svg class="mobile-tabbar-profile" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="my-info-ring" cx="12" cy="12" r="8.7"></circle>
+          <circle class="my-info-head" cx="12" cy="9.2" r="3.6"></circle>
+          <path class="my-info-body" d="M5.6 18.45c1.15-2.75 3.78-4.2 6.4-4.2s5.25 1.45 6.4 4.2c-1.48 1.43-3.73 2.35-6.4 2.35s-4.92-.92-6.4-2.35Z"></path>
+        </svg>
+      </span>
+      <span class="mobile-tabbar-label">나의정보</span>
+    </button>
+  </nav>
 
   <!-- Preview Modal -->
   <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
@@ -234,14 +270,19 @@
   <!-- My Info Modal -->
   <div id="myInfoModal" class="modal hidden" role="dialog" aria-modal="true">
     <div class="modal-backdrop" data-close-myinfo="1"></div>
-    <div class="modal-card package-modal-card">
-      <div class="modal-head">
-        <div>
-          <div class="m-title">나의 정보</div>
-          <div class="m-meta">계정 정보 및 비밀번호 변경</div>
+      <div class="modal-card package-modal-card">
+        <div class="modal-head">
+          <div>
+            <div class="m-title">나의 정보</div>
+            <div class="m-meta">계정 정보 및 비밀번호 변경</div>
+          </div>
+          <button class="myinfo-close-btn" type="button" data-close-myinfo="1" aria-label="닫기">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M8 8l8 8M16 8l-8 8"></path>
+            </svg>
+          </button>
         </div>
-        <button class="btn" type="button" data-close-myinfo="1">닫기</button>
-      </div>
       <div class="modal-body package-form myinfo-form">
         <div class="package-name-line">
           <span>닉네임</span>

@@ -10,6 +10,10 @@ function nextPath() {
   return n;
 }
 
+function getAuthRedirectUrl() {
+  return new URL("./auth.html", location.href).toString();
+}
+
 function setStatus(msg, isError = false) {
   const el = $("#authStatus");
   if (!el) return;
@@ -437,6 +441,7 @@ async function initAuth() {
       email,
       password,
       options: {
+        emailRedirectTo: getAuthRedirectUrl(),
         data: {
           nickname,
         },
@@ -457,7 +462,9 @@ async function initAuth() {
       setStatus("비밀번호 재설정을 위해 이메일을 입력해 주세요.", true);
       return;
     }
-    const { error } = await client.auth.resetPasswordForEmail(email);
+    const { error } = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthRedirectUrl(),
+    });
     if (error) {
       setStatus(error.message || "비밀번호 재설정 메일 발송에 실패했습니다.", true);
       return;

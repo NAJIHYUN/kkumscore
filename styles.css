@@ -343,6 +343,9 @@ body[data-vault] .brand-social{
 .search-wrap{
   position:relative;
   width:100%;
+  min-height:42px;
+  display:flex;
+  align-items:center;
   padding:10px 12px;
   border:1px solid #ddd;
   border-radius:12px;
@@ -385,6 +388,7 @@ body[data-vault] .brand-social{
 }
 .sort-dropdown{position:relative}
 .sort-trigger{
+  min-height:42px;
   display:flex;
   align-items:center;
   justify-content:space-between;
@@ -1369,7 +1373,7 @@ body[data-my-info] #myInfoRole{
 
 /* Share page */
 .share-card{
-  background:#fff;border:1px solid #e6e6e6;border-radius:14px;padding:14px;margin-bottom:12px
+  background:#fff;border:none;border-radius:14px;padding:14px;margin-bottom:12px
 }
 .h2{margin:0 0 10px 0;font-size:15px}
 .summary-inline{display:flex;flex-wrap:wrap;gap:10px}
@@ -2679,6 +2683,13 @@ body[data-my-info] #myInfoRole{
     background:transparent;
     border-color:#4e5968;
   }
+  html[data-ui-theme="dark"] #addModal .add-label > span{
+    color:#f2f4f6;
+  }
+  html[data-ui-theme="dark"] #addModal .add-label .select{
+    text-align:center;
+    text-align-last:center;
+  }
   html[data-ui-theme="dark"] .input::placeholder,
   html[data-ui-theme="dark"] .package-name-input::placeholder,
   html[data-ui-theme="dark"] .vault-search-wrap .input::placeholder,
@@ -2768,6 +2779,12 @@ body[data-my-info] #myInfoRole{
   html[data-ui-theme="dark"] .scroll-index{
     background:rgba(25,31,40,.98);
   }
+  html[data-ui-theme="dark"] .table-wrap:hover .scroll-index,
+  html[data-ui-theme="dark"] .scroll-index:focus-within,
+  html[data-ui-theme="dark"] .scroll-index.dragging{
+    --scroll-rail-bg:#020913;
+    background:#020913;
+  }
   html[data-ui-theme="dark"] .table-wrap::after{
     background:#020913;
   }
@@ -2775,8 +2792,12 @@ body[data-my-info] #myInfoRole{
   html[data-ui-theme="dark"] .scroll-index-hint{
     color:#d1d6db;
   }
+  html[data-ui-theme="dark"] .scroll-index-hint{
+    background:#333d4b;
+    color:#b0b8c1;
+  }
   html[data-ui-theme="dark"] .scroll-index-item.current{
-    color:#001936;
+    color:#f9fafb;
   }
   html[data-ui-theme="dark"] .mobile-tabbar-profile{
     color:#8b95a1;

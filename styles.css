@@ -2578,12 +2578,13 @@ body[data-my-info] #myInfoRole{
   }
   html[data-ui-theme="dark"] .table-wrap,
   html[data-ui-theme="dark"] .vault-empty,
+  html[data-ui-theme="dark"] .share-card,
   html[data-ui-theme="dark"] .page-thumb,
   html[data-ui-theme="dark"] .pdf-main-wrap,
   html[data-ui-theme="dark"] .page-thumb.page-slide .page-thumb-image,
   html[data-ui-theme="dark"] .page-thumb.page-slide .page-thumb-canvas{
     background:transparent;
-    color:#f2f4f6;
+    color:#191f28;
     border-color:#4e5968;
   }
   html[data-ui-theme="dark"] .table-body,
@@ -2737,6 +2738,16 @@ body[data-my-info] #myInfoRole{
     background:#3182f6;
     border-color:#3182f6;
     color:#f9fafb;
+  }
+  html[data-ui-theme="dark"] #btnPickSheets{
+    border-color:#194aa6;
+    color:#ffffff;
+    background:#194aa6;
+  }
+  html[data-ui-theme="dark"] #btnSharePackageLink{
+    background:#191f28;
+    border-color:#4e5968;
+    color:#f2f4f6;
   }
   html[data-ui-theme="dark"] #btnShareSelected{
     background:#4e5968;

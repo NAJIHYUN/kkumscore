@@ -1710,9 +1710,9 @@ body[data-my-info] #myInfoRole{
 }
 .page-box{
   flex:0 0 auto;
-  width:160px;
   position:relative;
   margin:15px;
+  max-width:160px;
 }
 .sheet-select-mode .page-box,
 .sheet-select-mode .page-canvas{
@@ -1983,6 +1983,9 @@ body[data-my-info] #myInfoRole{
   }
   body[data-my-packages] .top-actions{
     display:none;
+  }
+  body[data-share] .container{
+    padding:20px;
   }
   body[data-my-info] .top-actions{
     display:none;

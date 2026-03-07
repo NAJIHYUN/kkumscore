@@ -1298,11 +1298,11 @@ body[data-my-info] #myInfoRole{
 }
 .package-note-input{
   min-height:96px;
-  padding:10px 12px;
+  padding: 12px 15px;
   line-height:1.45;
   resize:vertical;
   text-align:start;
-  background:#bfbfbf;
+  background:#f2f4f6;
 }
 .add-form-grid{
   display:grid;

@@ -7,6 +7,7 @@ const $ = (s) => document.querySelector(s);
 const shareState = {
   selectMode: false,
   pageCounts: new Map(),
+  pageNumberLists: new Map(),
   selectedPages: new Map(),
 };
 
@@ -63,9 +64,9 @@ function updateDownloadPickedUI() {
 
 function getVaultMetaFromTeam(team = "") {
   const value = String(team || "").trim().toLowerCase();
-  if (value === "high") return { href: "./vault-dreamhigh.html", label: "☁️ 고등부" };
-  if (value === "middle") return { href: "./vault-middle.html", label: "😎 중등부" };
-  return { href: "./vault-all.html", label: "📂 기타" };
+  if (value === "high") return { href: "./vault-dreamhigh.html", label: "고등부" };
+  if (value === "middle") return { href: "./vault-middle.html", label: "중등부" };
+  return { href: "./vault-all.html", label: "기타" };
 }
 
 function decodeShareSongsPayload(encoded = "") {
@@ -93,6 +94,9 @@ function decodeShareSongsPayload(encoded = "") {
         artist: String(s.artist || ""),
         key: String(s.key || ""),
         pdfUrl: String(s.pdfUrl || ""),
+        includedPages: Array.isArray(s.includedPages)
+          ? s.includedPages.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
+          : null,
       }))
       .filter((s) => s.id && s.pdfUrl);
   } catch {
@@ -198,6 +202,13 @@ async function init() {
   const packageMemo = (url.searchParams.get("memo") || "").trim();
   const hasRealPackageBy = !!packageBy && packageBy !== "닉네임";
   await setupShareTopActions();
+  const teamClass = packageTeam === "high"
+    ? "share-team-high"
+    : packageTeam === "middle"
+      ? "share-team-middle"
+      : "share-team-all";
+  document.body.classList.remove("share-team-high", "share-team-middle", "share-team-all");
+  document.body.classList.add(teamClass);
 
   const songsJson = await loadSongsJsonSafe();
   const songsRemote = await loadSongsFromSupabaseByIds(ids);
@@ -207,16 +218,21 @@ async function init() {
     songById.set(song.id, song);
   });
 
-  const picked = ids.map((id) => songById.get(id)).filter(Boolean);
+  let picked = ids.map((id) => songById.get(id)).filter(Boolean);
   if (!picked.length && payloadSongs.length) {
     picked.push(...payloadSongs);
   }
+  picked = picked.filter((song) => !Array.isArray(song.includedPages) || song.includedPages.length > 0);
 
   const packageVaultBtn = $("#packageVaultBtn");
   if (packageVaultBtn) {
     const vaultMeta = getVaultMetaFromTeam(packageTeam);
     packageVaultBtn.href = vaultMeta.href;
     packageVaultBtn.textContent = vaultMeta.label;
+    packageVaultBtn.classList.remove("vault-team-high", "vault-team-middle", "vault-team-all");
+    if (packageTeam === "high") packageVaultBtn.classList.add("vault-team-high");
+    else if (packageTeam === "middle") packageVaultBtn.classList.add("vault-team-middle");
+    else packageVaultBtn.classList.add("vault-team-all");
   }
   if (packageName) {
     document.title = `${packageName} - 선택 공유`;
@@ -232,13 +248,8 @@ async function init() {
   }
   const packageMemoEl = $("#packageMemo");
   if (packageMemoEl) {
-    if (packageMemo) {
-      packageMemoEl.textContent = packageMemo;
-      packageMemoEl.classList.remove("hidden");
-    } else {
-      packageMemoEl.textContent = "";
-      packageMemoEl.classList.add("hidden");
-    }
+    packageMemoEl.textContent = packageMemo || "(메모 없음)";
+    packageMemoEl.classList.remove("hidden");
   }
 
   const list = $("#shareSheets");
@@ -329,7 +340,11 @@ async function init() {
         if (!res.ok) continue;
         const bytes = await res.arrayBuffer();
         const src = await PDFLib.PDFDocument.load(bytes);
-        const pages = await mergedPdf.copyPages(src, src.getPageIndices());
+        const indices = (Array.isArray(song.includedPages) && song.includedPages.length)
+          ? song.includedPages.map((n) => n - 1).filter((idx) => idx >= 0 && idx < src.getPageCount())
+          : src.getPageIndices();
+        if (!indices.length) continue;
+        const pages = await mergedPdf.copyPages(src, indices);
         pages.forEach((p) => mergedPdf.addPage(p));
       }
 
@@ -477,9 +492,15 @@ async function renderPdfPages(song, container) {
   try {
     const loadingTask = pdfjsLib.getDocument(song.pdfUrl);
     const doc = await loadingTask.promise;
-    shareState.pageCounts.set(song.id, doc.numPages);
+    const pageNumbers = (Array.isArray(song.includedPages) && song.includedPages.length)
+      ? song.includedPages
+        .map((n) => Number(n))
+        .filter((n) => Number.isInteger(n) && n > 0 && n <= doc.numPages)
+      : Array.from({ length: doc.numPages }, (_, idx) => idx + 1);
+    shareState.pageCounts.set(song.id, pageNumbers.length);
+    shareState.pageNumberLists.set(song.id, pageNumbers);
 
-    for (let pageNum = 1; pageNum <= doc.numPages; pageNum += 1) {
+    for (const pageNum of pageNumbers) {
       const pageBox = document.createElement("div");
       pageBox.className = "page-box";
       pageBox.dataset.songId = song.id;
@@ -549,14 +570,15 @@ function getSelectedSet(songId) {
 }
 
 function toggleSongSelection(songId) {
-  const total = shareState.pageCounts.get(songId) || 0;
+  const pages = shareState.pageNumberLists.get(songId) || [];
+  const total = pages.length;
   if (total <= 0) return;
   const set = getSelectedSet(songId);
   if (set.size === total) {
     set.clear();
   } else {
     set.clear();
-    for (let i = 1; i <= total; i += 1) set.add(i);
+    pages.forEach((pageNum) => set.add(pageNum));
   }
   refreshSelectionUI(songId);
 }

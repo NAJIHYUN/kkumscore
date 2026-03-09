@@ -7,7 +7,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>찬양팀 악보함</title>
+  <title>찜 악보</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎵</text></svg>">
   <script src="./theme.js"></script>
   <link rel="stylesheet" href="./styles.css" />
@@ -20,11 +20,11 @@
   <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
   <script defer src="./app.js"></script>
 </head>
-<body class="index-page">
+<body class="index-page" data-page="favorite">
   <header class="topbar">
       <div class="top-main">
         <div class="brand">
-          <strong>꿈꾸는교회 악보함</strong>
+          <strong>찜 악보</strong>
         </div>
         <div class="top-actions">
           <a id="btnMyInfo" class="my-info-link hidden" href="./my-info.html" aria-label="나의 정보">
@@ -49,16 +49,10 @@
     <section class="controls">
       <button id="btnSelectMode" class="btn home-btn">선택</button>
       <button id="btnClearSelected" class="btn home-btn hidden" type="button">선택 초기화</button>
-      <button id="btnShareSelected" class="btn home-btn primary" disabled>담기에 추가</button>
+      <button id="btnShareSelected" class="btn home-btn primary" disabled>콘티 생성</button>
       <div class="search-wrap">
         <input id="q" class="input" type="text" placeholder="악보 검색" />
         <button id="btnClearSearch" class="search-clear hidden" type="button" aria-label="검색어 지우기">×</button>
-        <span class="index-search-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="6.5"></circle>
-            <path d="m16 16 4.5 4.5"></path>
-          </svg>
-        </span>
       </div>
       <div id="sortDropdown" class="sort-dropdown">
         <button id="sortTrigger" type="button" class="select sort-trigger" aria-haspopup="listbox" aria-expanded="false">가나다순</button>
@@ -105,7 +99,7 @@
   </main>
 
   <nav class="mobile-tabbar" aria-label="모바일 네비게이션">
-    <a class="mobile-tabbar-item is-current" href="./index.html" aria-current="page">
+    <a class="mobile-tabbar-item" href="./index.html">
       <span class="mobile-tabbar-icon" aria-hidden="true">
         <svg class="mobile-tabbar-home" viewBox="0 0 24 24">
           <path d="M4.5 10.2 12 4l7.5 6.2V20a1 1 0 0 1-1 1h-4.1v-6.2H9.6V21H5.5a1 1 0 0 1-1-1z"></path>
@@ -115,9 +109,11 @@
     </a>
     <a class="mobile-tabbar-item" href="./damgi.html">
       <span class="mobile-tabbar-icon" aria-hidden="true">
-        <svg class="mobile-tabbar-damgi mobile-tabbar-damgi-index" viewBox="0 0 24 24">
-          <path d="M7 3.5a1 1 0 0 0-1 1V19.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8.2a1 1 0 0 0-.3-.7l-4-4A1 1 0 0 0 13 3H7z"></path>
-          <path d="M13 3.9V8h4.1"></path>
+        <svg class="mobile-tabbar-damgi" viewBox="0 0 24 24">
+          <path d="M7 3.5h7.5L19.5 8v12.5H7z"></path>
+          <path d="M14.5 3.5V8H19.5"></path>
+          
+          
         </svg>
       </span>
       <span class="mobile-tabbar-label">담기</span>
@@ -132,7 +128,7 @@
       </span>
       <span class="mobile-tabbar-label">콘티</span>
     </a>
-    <a class="mobile-tabbar-item" href="./favorite.html">
+    <a class="mobile-tabbar-item is-current" href="./favorite.html" aria-current="page">
       <span class="mobile-tabbar-icon" aria-hidden="true">
         <svg class="mobile-tabbar-favorite" viewBox="0 0 24 24">
           <path d="M12 21s-6.7-4.35-9.3-8.3C.4 9.27 1.62 5.2 5.42 4.22A5.4 5.4 0 0 1 12 6.36a5.4 5.4 0 0 1 6.58-2.14c3.8.98 5.02 5.05 2.72 8.48C18.7 16.65 12 21 12 21Z"></path>

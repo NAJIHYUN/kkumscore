@@ -9,12 +9,16 @@ const state = {
   filtered: [],
   selectMode: false,
   selectedIds: [], // 순서대로 저장
+  favoriteIds: new Set(),
+  favoritesOnly: false,
   myRole: "all",
   myNickname: "",
 };
 
 const SB_SONGS_TABLE = "songs";
 const SB_FILES_BUCKET = "score-files";
+const FAVORITES_STORAGE_KEY = "scorebox_favorite_song_ids";
+const DAMGI_STORAGE_KEY = "scorebox_damgi_items";
 
 let previewSession = 0;
 let previewDoc = null;
@@ -60,6 +64,87 @@ function getChosung(str = "") {
 
 function normalize(str="") {
   return String(str).normalize("NFC").trim().toLowerCase();
+}
+
+function loadFavoriteIds() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FAVORITES_STORAGE_KEY) || "[]");
+    if (!Array.isArray(raw)) return new Set();
+    return new Set(raw.map((id) => String(id)).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveFavoriteIds() {
+  try {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(Array.from(state.favoriteIds)));
+  } catch (err) {
+    console.warn("favorite 저장 실패:", err);
+  }
+}
+
+function isFavoriteSong(songId) {
+  return state.favoriteIds.has(String(songId || ""));
+}
+
+function toggleFavoriteSong(songId) {
+  const id = String(songId || "");
+  if (!id) return;
+  if (state.favoriteIds.has(id)) {
+    state.favoriteIds.delete(id);
+  } else {
+    state.favoriteIds.add(id);
+  }
+  saveFavoriteIds();
+  render();
+}
+
+function loadDamgiItems() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DAMGI_STORAGE_KEY) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveDamgiItems(items = []) {
+  try {
+    localStorage.setItem(DAMGI_STORAGE_KEY, JSON.stringify(items));
+  } catch (err) {
+    console.warn("담기 저장 실패:", err);
+  }
+}
+
+function addSelectedSongsToDamgi() {
+  const picked = state.selectedIds
+    .map((id) => state.songs.find((song) => song.id === id))
+    .filter(Boolean)
+    .map((song) => ({
+      id: song.id,
+      title: song.title || "",
+      artist: song.artist || "",
+      key: song.key || "",
+      pdfUrl: song.pdfUrl || "",
+      jpgUrl: song.jpgUrl || "",
+      addedAt: new Date().toISOString(),
+    }));
+  if (!picked.length) return 0;
+
+  const existing = loadDamgiItems();
+  const byId = new Map(existing.map((item) => [String(item.id), item]));
+  const orderedIds = existing.map((item) => String(item.id));
+
+  picked.forEach((item) => {
+    const key = String(item.id);
+    if (!byId.has(key)) orderedIds.push(key);
+    byId.set(key, item);
+  });
+
+  const merged = orderedIds.map((id) => byId.get(id)).filter(Boolean);
+  saveDamgiItems(merged);
+  return picked.length;
 }
 
 function matchesQuery(song, q) {
@@ -203,7 +288,10 @@ function render() {
     el.classList.toggle("select-mode", state.selectMode);
   });
 
-  const filtered = state.songs.filter(s => matchesQuery(s, q));
+  const filtered = state.songs.filter((song) => {
+    if (state.favoritesOnly && !isFavoriteSong(song.id)) return false;
+    return matchesQuery(song, q);
+  });
   const sorted = sortSongs(filtered, sortMode);
   if (state.selectMode && state.selectedIds.length > 0) {
     const selectedMap = new Map(sorted.map((song) => [song.id, song]));
@@ -293,6 +381,25 @@ function render() {
     tdKey.className = "col-key";
     tdKey.textContent = song.key;
 
+    const tdFav = document.createElement("td");
+    tdFav.className = "col-fav";
+    const favBtn = document.createElement("button");
+    const isFavorite = isFavoriteSong(song.id);
+    favBtn.type = "button";
+    favBtn.className = `smallbtn favorite-btn${isFavorite ? " is-favorite" : ""}`;
+    favBtn.title = isFavorite ? "좋아요 취소" : "좋아요";
+    favBtn.setAttribute("aria-label", isFavorite ? "좋아요 취소" : "좋아요");
+    favBtn.innerHTML = `
+      <svg class="icon-action" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 21s-6.7-4.35-9.3-8.3C.4 9.27 1.62 5.2 5.42 4.22A5.4 5.4 0 0 1 12 6.36a5.4 5.4 0 0 1 6.58-2.14c3.8.98 5.02 5.05 2.72 8.48C18.7 16.65 12 21 12 21Z"></path>
+      </svg>
+    `;
+    favBtn.disabled = rowActionDisabled;
+    favBtn.addEventListener("click", () => {
+      toggleFavoriteSong(song.id);
+    });
+    tdFav.appendChild(favBtn);
+
     const tdMove = document.createElement("td");
     tdMove.className = "col-move";
     if (showMobileMoveHandle && selectedOrder >= 0) {
@@ -361,7 +468,7 @@ function render() {
     shareBtn.addEventListener("click", () => shareSingle(song));
     tdShare.appendChild(shareBtn);
 
-    tr.append(tdCheck, tdTitle, tdArtist, tdKey, tdMove, tdDown, tdShare);
+    tr.append(tdCheck, tdTitle, tdArtist, tdKey, tdFav, tdMove, tdDown, tdShare);
     tbody.appendChild(tr);
   }
 
@@ -2751,6 +2858,12 @@ async function init() {
     dedup.push(song);
   }
   state.songs = dedup;
+  state.favoriteIds = loadFavoriteIds();
+  state.favoriteIds = new Set(
+    Array.from(state.favoriteIds).filter((id) => state.songs.some((song) => song.id === id))
+  );
+  saveFavoriteIds();
+  state.favoritesOnly = document.body?.dataset?.page === "favorite";
 
   hydrateSelectionFromUrl();
   syncSortOptionsByViewport();
@@ -2810,17 +2923,9 @@ async function init() {
 
   $("#btnShareSelected").addEventListener("click", async () => {
     if (!state.selectMode || state.selectedIds.length === 0) return;
-    if (!state.myNickname) {
-      const nick = await getCurrentUserNickname();
-      if (nick) state.myNickname = nick;
-    }
-    const pkgMeta = await openPackageCreateDialog();
-    if (!pkgMeta) return;
-    const link = buildShareLinkFromSelected(pkgMeta);
-    if (!link) return;
-    const saved = await savePackageToVault(pkgMeta, link);
-    if (!saved) return;
-    window.open(link, "_blank");
+    const addedCount = addSelectedSongsToDamgi();
+    if (!addedCount) return;
+    location.href = "./damgi.html";
   });
 
   $("#btnMergeSelected").addEventListener("click", async () => {

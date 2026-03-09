@@ -7,34 +7,61 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>내 콘티</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+  <title>담기</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📄</text></svg>">
   <script src="./theme.js"></script>
   <link rel="stylesheet" href="./styles.css" />
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./supabase-config.js"></script>
   <script defer src="./supabase-client.js"></script>
   <script defer src="./auth-guard.js"></script>
-  <script defer src="./my-packages.js"></script>
+  <script defer src="./damgi.js"></script>
 </head>
-<body data-my-packages="1">
+<body class="index-page" data-damgi="1">
   <header class="topbar">
     <div class="brand">
-      <strong id="myPackagesTitle">📦 내 콘티</strong>
-      <span class="sub">내가 생성한 콘티 리스트</span>
-    </div>
-    <div class="top-actions"><a class="link" href="./index.html">← 악보 목록</a>
+      <strong>담기</strong>
     </div>
   </header>
+
   <main class="container">
-    <section>
-      <div class="vault-search-wrap">
-        <input id="myPackagesSearch" class="input" type="text" placeholder="검색 (예: 콘티명 / 초성)" />
-        <button id="btnClearMyPackagesSearch" class="vault-search-clear hidden" type="button" aria-label="검색어 전체 삭제">×</button>
+    <section class="share-card damgi-meta-card">
+      <div class="package-form damgi-meta-form">
+        <label class="add-label package-name-line" for="damgiPackageName">
+          <span>콘티 이름 <em id="damgiNameRequired" class="damgi-required hidden">*필수</em></span>
+          <input id="damgiPackageName" class="input package-name-input" type="text" placeholder="예: 260308 주일예배 콘티" />
+        </label>
+        <div class="add-label package-vault-line">
+          <span>콘티 종류 <em id="damgiTeamRequired" class="damgi-required hidden">*필수</em></span>
+          <div class="team-toggle" role="radiogroup" aria-label="콘티 대상">
+            <label class="team-option">
+              <input type="radio" name="damgiTeam" value="high" />
+              <span>고등부</span>
+            </label>
+            <label class="team-option">
+              <input type="radio" name="damgiTeam" value="middle" />
+              <span>중등부</span>
+            </label>
+            <label class="team-option">
+              <input type="radio" name="damgiTeam" value="etc" />
+              <span>기타</span>
+            </label>
+          </div>
+        </div>
+        <label class="add-label package-note-line" for="damgiPackageMemo">
+          <span>메모</span>
+          <textarea id="damgiPackageMemo" class="input package-name-input package-note-input" rows="3" placeholder="메모를 입력하세요"></textarea>
+        </label>
       </div>
-      <div id="myPackagesList" class="vault-list"></div>
+    </section>
+    <span class="damgi-list-title">담은 악보</span>
+    <section id="damgiList" class="damgi-list"></section>
+    <section class="damgi-controls">
+      <button id="btnCreateFromDamgi" class="btn primary" type="button">콘티 생성</button>
     </section>
   </main>
+
   <nav class="mobile-tabbar" aria-label="모바일 네비게이션">
     <a class="mobile-tabbar-item" href="./index.html">
       <span class="mobile-tabbar-icon" aria-hidden="true">
@@ -44,13 +71,11 @@
       </span>
       <span class="mobile-tabbar-label">홈</span>
     </a>
-    <a class="mobile-tabbar-item" href="./damgi.html">
+    <a class="mobile-tabbar-item is-current" href="./damgi.html" aria-current="page">
       <span class="mobile-tabbar-icon" aria-hidden="true">
-        <svg class="mobile-tabbar-damgi" viewBox="0 0 24 24">
-          <path d="M7 3.5h7.5L19.5 8v12.5H7z"></path>
-          <path d="M14.5 3.5V8H19.5"></path>
-          
-          
+        <svg class="mobile-tabbar-damgi mobile-tabbar-damgi-index" viewBox="0 0 24 24">
+          <path d="M7 3.5a1 1 0 0 0-1 1V19.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V8.2a1 1 0 0 0-.3-.7l-4-4A1 1 0 0 0 13 3H7z"></path>
+          <path d="M13 3.9V8h4.1"></path>
         </svg>
       </span>
       <span class="mobile-tabbar-label">담기</span>

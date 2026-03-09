@@ -57,6 +57,12 @@ function getVaultLabel(vault = "") {
   return "📂 기타";
 }
 
+function normalizeVaultKey(vault = "") {
+  const v = String(vault || "").toLowerCase();
+  if (v === "high" || v === "middle" || v === "all") return v;
+  return "all";
+}
+
 async function getSession() {
   if (!window.SB?.isConfigured()) return null;
   const client = window.SB.getClient();
@@ -66,14 +72,32 @@ async function getSession() {
 }
 
 async function loadMyPackages() {
+  const loadLocal = (vault = "all") => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(`scorebox_vault_${vault}`) || "[]");
+      if (!Array.isArray(raw)) return [];
+      return raw.map((item, idx) => ({
+        id: `local-${vault}-${idx}-${String(item?.createdAt || "")}`,
+        name: item?.name || "이름 없는 콘티",
+        url: item?.url || "",
+        vault,
+        vaultLabel: getVaultLabel(vault),
+        createdAt: item?.createdAt || new Date().toISOString(),
+      }));
+    } catch {
+      return [];
+    }
+  };
+  const localItems = [...loadLocal("high"), ...loadLocal("middle"), ...loadLocal("all")];
+
   const client = window.SB?.getClient?.();
-  if (!client) return [];
+  if (!client) return localItems;
   const { data, error } = await client
     .from("packages")
     .select("id, name, url, vault, created_at")
     .order("created_at", { ascending: false });
-  if (error || !Array.isArray(data)) return [];
-  return data.map((row) => ({
+  if (error || !Array.isArray(data)) return localItems;
+  const remoteItems = data.map((row) => ({
     id: row.id,
     name: row.name || "이름 없는 콘티",
     url: row.url || "",
@@ -81,6 +105,16 @@ async function loadMyPackages() {
     vaultLabel: getVaultLabel(row.vault),
     createdAt: row.created_at,
   }));
+  const keyOf = (x) => `${x.vault}|${x.name}|${x.url}`;
+  const seen = new Set(remoteItems.map(keyOf));
+  const merged = [...remoteItems];
+  localItems.forEach((item) => {
+    const key = keyOf(item);
+    if (seen.has(key)) return;
+    seen.add(key);
+    merged.push(item);
+  });
+  return merged;
 }
 
 async function deletePackage(id) {
@@ -141,7 +175,7 @@ async function renderList(query = "") {
     packageNameEl.textContent = item.name;
 
     const vaultEl = document.createElement("span");
-    vaultEl.className = "vault-item-nickname";
+    vaultEl.className = `vault-item-nickname vault-label-${normalizeVaultKey(item.vault)}`;
     vaultEl.textContent = item.vaultLabel;
 
     name.append(packageNameEl, vaultEl);

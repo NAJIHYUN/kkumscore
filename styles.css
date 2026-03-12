@@ -2503,6 +2503,7 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
     padding-right:24px;
     min-width:0;
     font-size:13px;
+    color:#020913;
     white-space:nowrap;
     overflow:hidden;
     text-overflow:ellipsis;
@@ -2510,6 +2511,8 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
   body[data-songlist] .songlist-search-wrap .input::placeholder{
     text-align:left;
     font-size:13px;
+    color:#020913;
+    opacity:1;
   }
   body[data-songlist] .songlist-search-icon{
     position:absolute;
@@ -2538,8 +2541,9 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
     width:64px;
     min-width:0;
     height:36px;
-    padding:0 18px 0 6px;
+    padding:0 20px 0 8px;
     font-size:12px;
+    color:#020913;
     -webkit-appearance:none;
     -moz-appearance:none;
     appearance:none;
@@ -2551,11 +2555,13 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
   body[data-songlist] .songlist-vault-btn{
     display:inline-flex;
     align-items:center;
-    gap:3px;
+    justify-content:center;
+    gap:0;
     text-decoration:none;
     min-width:0;
     padding:0 9px;
     font-size:10px;
+    color:#020913;
     white-space:nowrap;
   }
   body[data-songlist] .controls > .btn.home-btn.songlist-vault-btn{
@@ -2567,8 +2573,20 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
     border-color:#b8d5ff;
     color:#1b64da;
   }
+  body[data-songlist] .songlist-vault-icon{
+    width:14px;
+    height:14px;
+    display:block;
+    object-fit:contain;
+  }
   body[data-songlist] .songlist-vault-btn[data-vault-filter="high"].is-active .songlist-vault-icon{
-    filter:brightness(0) saturate(100%) invert(78%) sepia(71%) saturate(774%) hue-rotate(328deg) brightness(103%) contrast(103%);
+    filter:brightness(0) saturate(100%) invert(69%) sepia(56%) saturate(834%) hue-rotate(350deg) brightness(103%) contrast(96%);
+  }
+  body[data-songlist] .songlist-vault-btn[data-vault-filter="middle"].is-active .songlist-vault-icon{
+    filter:brightness(0) saturate(100%) invert(41%) sepia(63%) saturate(592%) hue-rotate(121deg) brightness(97%) contrast(98%);
+  }
+  body[data-songlist] .songlist-vault-btn[data-vault-filter="all"].is-active .songlist-vault-icon{
+    filter:brightness(0) saturate(100%) invert(29%) sepia(100%) saturate(986%) hue-rotate(202deg) brightness(90%) contrast(89%);
   }
   body[data-songlist] .songlist-vault-btn[data-vault-filter="high"].is-active{
     background:#fff9e7;
@@ -2580,22 +2598,10 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
     border-color:#76e4b8;
     color:#028450;
   }
-  body[data-songlist] .songlist-vault-btn[data-vault-filter="middle"].is-active .songlist-vault-icon{
-    filter:brightness(0) saturate(100%) invert(42%) sepia(64%) saturate(585%) hue-rotate(121deg) brightness(95%) contrast(98%);
-  }
   body[data-songlist] .songlist-vault-btn[data-vault-filter="all"].is-active{
     background:#e8f3ff;
     border-color:#90c2ff;
     color:#1957c2;
-  }
-  body[data-songlist] .songlist-vault-btn[data-vault-filter="all"].is-active .songlist-vault-icon{
-    filter:brightness(0) saturate(100%) invert(30%) sepia(94%) saturate(1128%) hue-rotate(201deg) brightness(90%) contrast(88%);
-  }
-  body[data-songlist] .songlist-vault-icon{
-    width:12px;
-    height:12px;
-    object-fit:contain;
-    display:block;
   }
   body[data-songlist] .songlist-list-section{
     flex:1 1 auto;
@@ -2641,6 +2647,52 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
   body[data-damgi] .package-form.damgi-meta-form,
   body[data-damgi] .package-form.damgi-meta-form *{
     font-size:14px;
+  }
+  body[data-damgi] .package-vault-line .team-option span{
+    gap:5px;
+  }
+  body[data-damgi] .package-vault-line .team-option span::before{
+    content:"";
+    width:12px;
+    height:12px;
+    flex:0 0 12px;
+    display:block;
+    background-repeat:no-repeat;
+    background-position:center;
+    background-size:contain;
+  }
+  body[data-damgi] .package-vault-line .team-option:nth-child(1) span::before{
+    background-image:url("./assets/high.svg");
+  }
+  body[data-damgi] .package-vault-line .team-option:nth-child(2) span::before{
+    background-image:url("./assets/middle.png");
+  }
+  body[data-damgi] .package-vault-line .team-option:nth-child(3) span::before{
+    background-image:url("./assets/allvault.png");
+  }
+  body[data-damgi] .package-vault-line .team-option input[value="high"]:checked + span{
+    background:#fff9e7;
+    border-color:#ffe69b;
+    color:#faa131;
+  }
+  body[data-damgi] .package-vault-line .team-option input[value="high"]:checked + span::before{
+    filter:brightness(0) saturate(100%) invert(69%) sepia(56%) saturate(834%) hue-rotate(350deg) brightness(103%) contrast(96%);
+  }
+  body[data-damgi] .package-vault-line .team-option input[value="middle"]:checked + span{
+    background:#f0faf6;
+    border-color:#76e4b8;
+    color:#028450;
+  }
+  body[data-damgi] .package-vault-line .team-option input[value="middle"]:checked + span::before{
+    filter:brightness(0) saturate(100%) invert(41%) sepia(63%) saturate(592%) hue-rotate(121deg) brightness(97%) contrast(98%);
+  }
+  body[data-damgi] .package-vault-line .team-option input[value="etc"]:checked + span{
+    background:#e8f3ff;
+    border-color:#90c2ff;
+    color:#1957c2;
+  }
+  body[data-damgi] .package-vault-line .team-option input[value="etc"]:checked + span::before{
+    filter:brightness(0) saturate(100%) invert(29%) sepia(100%) saturate(986%) hue-rotate(202deg) brightness(90%) contrast(89%);
   }
   body[data-damgi] #damgiPackageMemo{
     background:#f2f4f6;
@@ -3642,6 +3694,30 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
     background:#2272eb;
     border-color:#2272eb;
     color:#fff;
+  }
+  html[data-ui-theme="dark"] body[data-damgi] .package-vault-line .team-option input[value="high"]:checked + span{
+    background:#fff9e7;
+    border-color:#ffe69b;
+    color:#faa131;
+  }
+  html[data-ui-theme="dark"] body[data-damgi] .package-vault-line .team-option input[value="high"]:checked + span::before{
+    filter:brightness(0) saturate(100%) invert(69%) sepia(56%) saturate(834%) hue-rotate(350deg) brightness(103%) contrast(96%);
+  }
+  html[data-ui-theme="dark"] body[data-damgi] .package-vault-line .team-option input[value="middle"]:checked + span{
+    background:#f0faf6;
+    border-color:#76e4b8;
+    color:#028450;
+  }
+  html[data-ui-theme="dark"] body[data-damgi] .package-vault-line .team-option input[value="middle"]:checked + span::before{
+    filter:brightness(0) saturate(100%) invert(41%) sepia(63%) saturate(592%) hue-rotate(121deg) brightness(97%) contrast(98%);
+  }
+  html[data-ui-theme="dark"] body[data-damgi] .package-vault-line .team-option input[value="etc"]:checked + span{
+    background:#e8f3ff;
+    border-color:#90c2ff;
+    color:#1957c2;
+  }
+  html[data-ui-theme="dark"] body[data-damgi] .package-vault-line .team-option input[value="etc"]:checked + span::before{
+    filter:brightness(0) saturate(100%) invert(29%) sepia(100%) saturate(986%) hue-rotate(202deg) brightness(90%) contrast(89%);
   }
   html[data-ui-theme="dark"] .btn.primary,
   html[data-ui-theme="dark"] #btnShareSelected:not(:disabled),

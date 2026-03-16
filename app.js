@@ -3315,3 +3315,46 @@ init().catch(err => {
   console.error(err);
   alert("초기화 중 오류가 발생했습니다. 콘솔 로그를 확인해 주세요.");
 });
+
+// 1. 이벤트 저장 함수 정의
+async function trackEvent(eventType, eventData = {}) {
+  // supabase-client.js 등에서 생성된 supabase 객체를 사용합니다.
+  if (typeof supabase === 'undefined') {
+    console.error('Supabase 객체를 찾을 수 없습니다. 설정 파일을 확인해주세요.');
+    return;
+  }
+ 
+  const { error } = await supabase
+    .from('site_events')
+    .insert([
+      { 
+        session_id: 'session-' + Date.now(), 
+        event_type: eventType, 
+        metadata: eventData 
+      }
+    ]);
+ 
+  if (error) {
+    console.error('통계 전송 실패:', error);
+  } else {
+    console.log('실시간 통계 전송 완료! (' + eventType + ')');
+  }
+}
+ 
+// 2. 실행: 페이지 접속 시 자동으로 기록
+// (HTML이 다 로드된 후 실행되도록 약간의 지연을 주거나 바로 실행)
+window.addEventListener('DOMContentLoaded', () => {
+  trackEvent('page_view', { 
+    path: window.location.pathname,
+    title: document.title 
+  });
+});
+ 
+// 3. (선택) 버튼 클릭도 추적하고 싶다면?
+// 예: 고등부 버튼 클릭 시
+const highSchoolBtn = document.querySelector('a[href="./vault-dreamhigh.html"]');
+if (highSchoolBtn) {
+  highSchoolBtn.addEventListener('click', () => {
+    trackEvent('button_click', { target: '고등부' });
+  });
+}

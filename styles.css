@@ -115,8 +115,9 @@ a{color:inherit}
 }
 .brand{display:flex;gap:12px;align-items:baseline}
 .index-page .brand > strong{
-  font-size:20px;
-  line-height:1.2;
+  font-size:16px;
+  line-height:1;
+  font-weight: 500;
 }
 .index-page .brand #btnAddFile{
   margin-left:8px;

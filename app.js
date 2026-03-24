@@ -18,7 +18,6 @@ const state = {
 const SB_SONGS_TABLE = "songs";
 const SB_FILES_BUCKET = "score-files";
 const FAVORITES_STORAGE_KEY = "scorebox_favorite_song_ids";
-const DAMGI_STORAGE_KEY = "scorebox_damgi_items";
 const LOGIN_REQUIRED_MESSAGE = "이 기능은 로그인 후 사용할 수 있습니다.";
 
 let previewSession = 0;
@@ -124,53 +123,6 @@ function toggleFavoriteSong(songId) {
   }
   saveFavoriteIds();
   render();
-}
-
-function loadDamgiItems() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(DAMGI_STORAGE_KEY) || "[]");
-    return Array.isArray(raw) ? raw : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveDamgiItems(items = []) {
-  try {
-    localStorage.setItem(DAMGI_STORAGE_KEY, JSON.stringify(items));
-  } catch (err) {
-    console.warn("담기 저장 실패:", err);
-  }
-}
-
-function addSelectedSongsToDamgi() {
-  const picked = state.selectedIds
-    .map((id) => state.songs.find((song) => song.id === id))
-    .filter(Boolean)
-    .map((song) => ({
-      id: song.id,
-      title: song.title || "",
-      artist: song.artist || "",
-      key: song.key || "",
-      pdfUrl: song.pdfUrl || "",
-      jpgUrl: song.jpgUrl || "",
-      addedAt: new Date().toISOString(),
-    }));
-  if (!picked.length) return 0;
-
-  const existing = loadDamgiItems();
-  const byId = new Map(existing.map((item) => [String(item.id), item]));
-  const orderedIds = existing.map((item) => String(item.id));
-
-  picked.forEach((item) => {
-    const key = String(item.id);
-    if (!byId.has(key)) orderedIds.push(key);
-    byId.set(key, item);
-  });
-
-  const merged = orderedIds.map((id) => byId.get(id)).filter(Boolean);
-  saveDamgiItems(merged);
-  return picked.length;
 }
 
 function matchesQuery(song, q) {
@@ -3134,9 +3086,12 @@ async function init() {
     if (!state.selectMode || state.selectedIds.length === 0) return;
     const user = await requireLoggedInAction("콘티 생성은 로그인 후 사용할 수 있습니다.");
     if (!user) return;
-    const addedCount = addSelectedSongsToDamgi();
-    if (!addedCount) return;
-    location.href = "./damgi.html";
+    const pkgMeta = await openPackageCreateDialog();
+    if (!pkgMeta) return;
+    const link = buildShareLinkFromSelected(pkgMeta);
+    const saved = await savePackageToVault(pkgMeta, link);
+    if (!saved) return;
+    location.href = link;
   });
 
   $("#btnMergeSelected").addEventListener("click", async () => {

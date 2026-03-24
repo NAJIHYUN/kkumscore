@@ -1334,6 +1334,7 @@ async function selectSongsRows(client) {
     .select("id, owner_id, title, artist, key, pdf_url, jpg_url, created_at, uploader_nickname")
     .order("created_at", { ascending: false });
   if (!withNickname.error) return withNickname;
+  console.warn("songs select with uploader_nickname failed; falling back:", withNickname.error);
   return client
     .from(SB_SONGS_TABLE)
     .select("id, owner_id, title, artist, key, pdf_url, jpg_url, created_at")

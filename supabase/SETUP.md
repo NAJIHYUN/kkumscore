@@ -7,6 +7,7 @@
 ## 2) SQL 적용
 1. Supabase SQL Editor를 엽니다.
 2. `supabase/schema.sql` 내용을 실행합니다.
+3. 기존 프로젝트라면 `songs.uploader_nickname` 컬럼이 추가되었는지 확인합니다.
 
 ## 3) 프론트 설정
 1. `supabase-config.js` 파일을 열어 아래 값을 입력합니다.

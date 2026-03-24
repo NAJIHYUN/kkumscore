@@ -1328,6 +1328,18 @@ function getSongUploaderNickname(song = {}) {
   ).trim();
 }
 
+async function selectSongsRows(client) {
+  const withNickname = await client
+    .from(SB_SONGS_TABLE)
+    .select("id, owner_id, title, artist, key, pdf_url, jpg_url, created_at, uploader_nickname")
+    .order("created_at", { ascending: false });
+  if (!withNickname.error) return withNickname;
+  return client
+    .from(SB_SONGS_TABLE)
+    .select("id, owner_id, title, artist, key, pdf_url, jpg_url, created_at")
+    .order("created_at", { ascending: false });
+}
+
 function buildPreviewMeta(song = {}) {
   const artist = String(song?.artist || "").trim();
   const key = String(song?.key || "").trim();
@@ -2145,18 +2157,7 @@ async function loadSongsFromSupabase() {
     const client = window.SB.getClient();
     if (!client) return [];
 
-    const { data } = await client.auth.getSession();
-    const sessionUserId = data?.session?.user?.id || "";
-    const sessionNickname = String(
-      data?.session?.user?.user_metadata?.nickname ||
-      data?.session?.user?.email?.split("@")[0] ||
-      ""
-    ).trim();
-
-    const { data: rows, error } = await client
-      .from(SB_SONGS_TABLE)
-      .select("id, owner_id, title, artist, key, pdf_url, jpg_url, created_at")
-      .order("created_at", { ascending: false });
+    const { data: rows, error } = await selectSongsRows(client);
 
     if (error || !Array.isArray(rows)) return [];
     return rows.map((row) => ({
@@ -2166,7 +2167,7 @@ async function loadSongsFromSupabase() {
       key: row.key || "",
       pdfUrl: row.pdf_url || "",
       jpgUrl: row.jpg_url || "",
-      uploaderNickname: row.owner_id === sessionUserId ? sessionNickname : "",
+      uploaderNickname: String(row.uploader_nickname || "").trim(),
       createdAt: row.created_at || new Date().toISOString(),
     }));
   } catch (err) {
@@ -2335,6 +2336,7 @@ async function handleAddFileSubmit(e) {
         const fileUrl = await uploadSongFileToSupabase(file, userId);
         const payload = {
           owner_id: userId,
+          uploader_nickname: String(state.myNickname || "").trim(),
           ...toSongRecordPayload(songTitle, songArtist, songKey, fileUrl, file),
         };
         if (!payload.pdf_url && !payload.jpg_url) continue;
@@ -2342,7 +2344,7 @@ async function handleAddFileSubmit(e) {
         const { data: row, error } = await client
           .from(SB_SONGS_TABLE)
           .insert(payload)
-          .select("id, title, artist, key, pdf_url, jpg_url, created_at")
+          .select("id, title, artist, key, pdf_url, jpg_url, created_at, uploader_nickname")
           .single();
         if (error) throw error;
         uploadedSongs.push({
@@ -2352,7 +2354,7 @@ async function handleAddFileSubmit(e) {
           key: row.key || "",
           pdfUrl: row.pdf_url || "",
           jpgUrl: row.jpg_url || "",
-          uploaderNickname: String(state.myNickname || "").trim(),
+          uploaderNickname: String(row.uploader_nickname || state.myNickname || "").trim(),
           createdAt: row.created_at || new Date().toISOString(),
         });
         doneBytes += file.size || 0;

@@ -84,6 +84,7 @@ on public.packages(owner_id, created_at desc);
 create table if not exists public.songs (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
+  uploader_nickname text not null default '',
   title text not null,
   artist text not null default '',
   key text not null default '',
@@ -122,6 +123,9 @@ using (auth.uid() = owner_id);
 
 create index if not exists songs_created_idx
 on public.songs(created_at desc);
+
+alter table public.songs
+add column if not exists uploader_nickname text not null default '';
 
 -- 4) storage bucket + policies (song files)
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)

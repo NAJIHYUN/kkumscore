@@ -41,6 +41,7 @@ python3 -m http.server 5500
 2. SQL Editor에서 `supabase/schema.sql` 실행
 3. `supabase-config.js`에 `url`, `anonKey` 입력
 4. 회원가입 후 `profiles.approved = true`로 승인해야 로그인 가능
+5. 기존 프로젝트라면 `supabase/schema.sql`을 다시 실행해 `songs.uploader_nickname` 컬럼 추가
 
 ## 권한/정책 요약
 - `packages` 삭제: 본인 생성 항목만 가능 (RLS)
@@ -56,6 +57,7 @@ python3 -m http.server 5500
   "key": "G",
   "pdfUrl": "./files/sample.pdf",
   "jpgUrl": "",
+  "uploaderNickname": "업로더닉네임",
   "createdAt": "2026-02-21T00:00:00.000Z"
 }
 ```

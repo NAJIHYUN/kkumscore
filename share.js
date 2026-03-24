@@ -94,6 +94,7 @@ function decodeShareSongsPayload(encoded = "") {
         artist: String(s.artist || ""),
         key: String(s.key || ""),
         pdfUrl: String(s.pdfUrl || ""),
+        uploaderNickname: String(s.uploaderNickname || ""),
         includedPages: Array.isArray(s.includedPages)
           ? s.includedPages.map((n) => Number(n)).filter((n) => Number.isInteger(n) && n > 0)
           : null,
@@ -120,6 +121,7 @@ async function loadSongsJsonSafe() {
       artist: s.artist || "",
       key: s.key || "",
       pdfUrl: s.pdfUrl || s.file || "",
+      uploaderNickname: s.uploaderNickname || "",
     }));
   } catch {
     return [];
@@ -133,10 +135,18 @@ async function loadSongsFromSupabaseByIds(ids = []) {
   try {
     const client = window.SB.getClient();
     if (!client) return [];
-    const { data, error } = await client
+    let data;
+    let error;
+    ({ data, error } = await client
       .from("songs")
-      .select("id, title, artist, key, pdf_url")
-      .in("id", targetIds);
+      .select("id, title, artist, key, pdf_url, uploader_nickname")
+      .in("id", targetIds));
+    if (error) {
+      ({ data, error } = await client
+        .from("songs")
+        .select("id, title, artist, key, pdf_url")
+        .in("id", targetIds));
+    }
     if (error || !Array.isArray(data)) return [];
     return data.map((row) => ({
       id: row.id,
@@ -144,6 +154,7 @@ async function loadSongsFromSupabaseByIds(ids = []) {
       artist: row.artist || "",
       key: row.key || "",
       pdfUrl: row.pdf_url || "",
+      uploaderNickname: String(row.uploader_nickname || "").trim(),
     })).filter((s) => s.id && s.pdfUrl);
   } catch {
     return [];

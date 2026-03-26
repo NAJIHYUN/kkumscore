@@ -103,12 +103,14 @@ a{color:inherit}
   padding-bottom:120px;
 }
 .feed-post{
+  width:100%;
   position:relative;
   overflow:hidden;
   backdrop-filter:blur(16px);
 }
 .feed-list{
   display:grid;
+  width:100%;
   gap:14px;
   padding-bottom:8px;
 }

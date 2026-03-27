@@ -163,13 +163,27 @@ async function createMyInfoAvatarCroppedBlob() {
   canvas.height = AVATAR_CROP_OUTPUT_SIZE;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("이미지 캔버스를 만들 수 없습니다.");
-  const ratio = AVATAR_CROP_OUTPUT_SIZE / state.cropSize;
+  const scale = state.scale || 1;
+  const sourceX = Math.max(0, (state.cropInset - state.offsetX) / scale);
+  const sourceY = Math.max(0, (state.cropInset - state.offsetY) / scale);
+  const sourceSize = Math.min(
+    state.naturalWidth - sourceX,
+    state.naturalHeight - sourceY,
+    state.cropSize / scale,
+  );
+  if (!(sourceSize > 0)) {
+    throw new Error("프로필 이미지 자르기 범위를 계산하지 못했습니다.");
+  }
   ctx.drawImage(
     state.image,
-    (state.offsetX - state.cropInset) * ratio,
-    (state.offsetY - state.cropInset) * ratio,
-    state.naturalWidth * state.scale * ratio,
-    state.naturalHeight * state.scale * ratio,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    AVATAR_CROP_OUTPUT_SIZE,
+    AVATAR_CROP_OUTPUT_SIZE,
   );
   return await new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {

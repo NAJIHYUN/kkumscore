@@ -1725,18 +1725,6 @@ th.col-title{text-align:center}
   box-shadow:0 0 0 999px rgba(15,23,42,.42);
   border:2px solid rgba(255,255,255,.92);
 }
-.myinfo-avatar-crop-range{
-  display:grid;
-  gap:8px;
-}
-.myinfo-avatar-crop-range span{
-  color:#6b7684;
-  font-size:13px;
-  font-weight:700;
-}
-.myinfo-avatar-crop-range input{
-  width:100%;
-}
 .myinfo-avatar-crop-help{
   margin:0;
   color:#8a8f98;

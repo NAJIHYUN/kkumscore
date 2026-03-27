@@ -19,7 +19,8 @@ const myInfoAvatarCropState = {
   naturalWidth: 0,
   naturalHeight: 0,
   stageSize: 0,
-  minScale: 1,
+  cropInset: 0,
+  cropSize: 0,
   scale: 1,
   offsetX: 0,
   offsetY: 0,
@@ -112,7 +113,8 @@ function cleanupMyInfoAvatarCropState() {
   myInfoAvatarCropState.naturalWidth = 0;
   myInfoAvatarCropState.naturalHeight = 0;
   myInfoAvatarCropState.stageSize = 0;
-  myInfoAvatarCropState.minScale = 1;
+  myInfoAvatarCropState.cropInset = 0;
+  myInfoAvatarCropState.cropSize = 0;
   myInfoAvatarCropState.scale = 1;
   myInfoAvatarCropState.offsetX = 0;
   myInfoAvatarCropState.offsetY = 0;
@@ -133,10 +135,12 @@ function clampMyInfoAvatarCropPosition() {
   const state = myInfoAvatarCropState;
   const displayWidth = state.naturalWidth * state.scale;
   const displayHeight = state.naturalHeight * state.scale;
-  const minOffsetX = Math.min(0, state.stageSize - displayWidth);
-  const minOffsetY = Math.min(0, state.stageSize - displayHeight);
-  state.offsetX = Math.min(0, Math.max(minOffsetX, state.offsetX));
-  state.offsetY = Math.min(0, Math.max(minOffsetY, state.offsetY));
+  const frameStart = state.cropInset;
+  const frameEnd = state.cropInset + state.cropSize;
+  const minOffsetX = Math.min(frameStart, frameEnd - displayWidth);
+  const minOffsetY = Math.min(frameStart, frameEnd - displayHeight);
+  state.offsetX = Math.min(frameStart, Math.max(minOffsetX, state.offsetX));
+  state.offsetY = Math.min(frameStart, Math.max(minOffsetY, state.offsetY));
 }
 
 function syncMyInfoAvatarCropPreview() {
@@ -151,35 +155,19 @@ function syncMyInfoAvatarCropPreview() {
   imageEl.style.top = `${state.offsetY}px`;
 }
 
-function updateMyInfoAvatarCropScale(nextScale) {
-  const state = myInfoAvatarCropState;
-  if (!state.image || !state.stageSize) return;
-  const safeScale = Math.max(state.minScale, Number(nextScale) || state.minScale);
-  const prevDisplayWidth = state.naturalWidth * state.scale;
-  const prevDisplayHeight = state.naturalHeight * state.scale;
-  const centerX = (state.stageSize / 2 - state.offsetX) / prevDisplayWidth;
-  const centerY = (state.stageSize / 2 - state.offsetY) / prevDisplayHeight;
-  state.scale = safeScale;
-  const nextDisplayWidth = state.naturalWidth * state.scale;
-  const nextDisplayHeight = state.naturalHeight * state.scale;
-  state.offsetX = state.stageSize / 2 - nextDisplayWidth * centerX;
-  state.offsetY = state.stageSize / 2 - nextDisplayHeight * centerY;
-  syncMyInfoAvatarCropPreview();
-}
-
 async function createMyInfoAvatarCroppedBlob() {
   const state = myInfoAvatarCropState;
-  if (!state.image || !state.stageSize) throw new Error("프로필 이미지를 자를 수 없습니다.");
+  if (!state.image || !state.cropSize) throw new Error("프로필 이미지를 자를 수 없습니다.");
   const canvas = document.createElement("canvas");
   canvas.width = AVATAR_CROP_OUTPUT_SIZE;
   canvas.height = AVATAR_CROP_OUTPUT_SIZE;
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("이미지 캔버스를 만들 수 없습니다.");
-  const ratio = AVATAR_CROP_OUTPUT_SIZE / state.stageSize;
+  const ratio = AVATAR_CROP_OUTPUT_SIZE / state.cropSize;
   ctx.drawImage(
     state.image,
-    state.offsetX * ratio,
-    state.offsetY * ratio,
+    (state.offsetX - state.cropInset) * ratio,
+    (state.offsetY - state.cropInset) * ratio,
     state.naturalWidth * state.scale * ratio,
     state.naturalHeight * state.scale * ratio,
   );
@@ -194,8 +182,7 @@ async function createMyInfoAvatarCroppedBlob() {
 async function openMyInfoAvatarCropper(file) {
   const imageEl = $("#myInfoAvatarCropImage");
   const stage = $("#myInfoAvatarCropStage");
-  const zoomInput = $("#myInfoAvatarCropZoom");
-  if (!imageEl || !stage || !zoomInput || !file) return;
+  if (!imageEl || !stage || !file) return;
   cleanupMyInfoAvatarCropState();
   const objectUrl = URL.createObjectURL(file);
   const image = new Image();
@@ -210,16 +197,13 @@ async function openMyInfoAvatarCropper(file) {
   state.naturalWidth = image.naturalWidth || image.width;
   state.naturalHeight = image.naturalHeight || image.height;
   state.stageSize = stage.clientWidth || 280;
-  state.minScale = Math.max(state.stageSize / state.naturalWidth, state.stageSize / state.naturalHeight);
-  state.scale = state.minScale;
-  state.offsetX = (state.stageSize - state.naturalWidth * state.scale) / 2;
-  state.offsetY = (state.stageSize - state.naturalHeight * state.scale) / 2;
+  state.cropInset = 14;
+  state.cropSize = Math.max(state.stageSize - state.cropInset * 2, 1);
+  state.scale = Math.max(state.cropSize / state.naturalWidth, state.cropSize / state.naturalHeight);
+  state.offsetX = state.cropInset + (state.cropSize - state.naturalWidth * state.scale) / 2;
+  state.offsetY = state.cropInset + (state.cropSize - state.naturalHeight * state.scale) / 2;
 
   imageEl.src = objectUrl;
-  zoomInput.min = String(state.minScale);
-  zoomInput.max = String(Math.max(state.minScale + 2, state.minScale * 3));
-  zoomInput.step = "0.01";
-  zoomInput.value = String(state.scale);
   syncMyInfoAvatarCropPreview();
   openMyInfoAvatarCropModal();
 }
@@ -474,7 +458,6 @@ async function saveProfileImage(client, userId, file) {
 
 function bindMyInfoAvatarCropper(onSave) {
   const stage = $("#myInfoAvatarCropStage");
-  const zoomInput = $("#myInfoAvatarCropZoom");
   const saveBtn = $("#myInfoAvatarCropSave");
 
   document.querySelectorAll("[data-avatar-crop-close]").forEach((node) => {
@@ -482,10 +465,6 @@ function bindMyInfoAvatarCropper(onSave) {
       closeMyInfoAvatarCropModal();
       cleanupMyInfoAvatarCropState();
     });
-  });
-
-  zoomInput?.addEventListener("input", (event) => {
-    updateMyInfoAvatarCropScale(event.currentTarget?.value);
   });
 
   stage?.addEventListener("pointerdown", (event) => {

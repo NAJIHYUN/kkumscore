@@ -461,11 +461,17 @@ async function saveProfileImage(client, userId, file) {
     .eq("id", userId);
   if (profileError) throw profileError;
 
-  const { error: feedError } = await client
-    .from("feed_posts")
-    .update({ author_avatar_image_url: imageUrl })
-    .eq("owner_id", userId);
-  if (feedError) throw feedError;
+  try {
+    const { error: feedError } = await client
+      .from("feed_posts")
+      .update({ author_avatar_image_url: imageUrl })
+      .eq("owner_id", userId);
+    if (feedError) {
+      console.warn("feed avatar sync skipped:", feedError);
+    }
+  } catch (error) {
+    console.warn("feed avatar sync skipped:", error);
+  }
 
   return imageUrl;
 }

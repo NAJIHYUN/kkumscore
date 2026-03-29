@@ -8,6 +8,7 @@ const FEED_TYPE_MAP = {
   "praise-recommend": { label: "찬양 추천", badgeClass: "feed-post-badge-warm" },
 };
 const ANIMAL_EMOJIS = ["🐶", "🐱", "🐰", "🦊", "🐻", "🐼", "🐯", "🦁", "🐨", "🐷", "🐹", "🐵"];
+const KOR_INITIALS = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
 
 let feedWriteType = "";
 let feedWriteIsAdmin = false;
@@ -16,6 +17,8 @@ let feedWriteLinkUrl = "";
 let feedWriteLinkTitle = "";
 let feedWriteLinkThumbnailUrl = "";
 let feedLinkPreviewToken = 0;
+let feedScoreLibrary = [];
+let feedScoreLibraryLoaded = false;
 const FEED_DRAFT_STORAGE_KEY = "kkumakbo.feedDraft";
 
 function $(selector) {
@@ -29,6 +32,24 @@ function escapeHtml(value = "") {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function getChosung(str = "") {
+  const text = String(str).normalize("NFC");
+  let out = "";
+  for (const ch of text) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0xac00 && code <= 0xd7a3) {
+      out += KOR_INITIALS[Math.floor((code - 0xac00) / (21 * 28))] || "";
+    } else if (/[a-zA-Z0-9]/.test(ch)) {
+      out += ch.toLowerCase();
+    }
+  }
+  return out;
+}
+
+function normalizeSearchText(value = "") {
+  return String(value || "").normalize("NFC").trim().toLowerCase();
 }
 
 function getYoutubeThumbnailUrl(url = "") {
@@ -167,6 +188,69 @@ function getFeedAvatarMarkup(post) {
   return escapeHtml(String(post.authorAvatar || "").trim() || getStableAnimalEmoji(post.ownerId || post.author));
 }
 
+function buildFeedInlineMarkup(text = "") {
+  const urlRegex = /(https?:\/\/[^\s<]+)/gi;
+  let lastIndex = 0;
+  let markup = "";
+  for (const match of text.matchAll(urlRegex)) {
+    const url = match[0];
+    const index = match.index || 0;
+    markup += escapeHtml(text.slice(lastIndex, index));
+    markup += `<a href="${escapeHtml(url)}" target="_blank" rel="noreferrer">${escapeHtml(url)}</a>`;
+    lastIndex = index + url.length;
+  }
+  markup += escapeHtml(text.slice(lastIndex));
+  return markup;
+}
+
+function parseFeedScoreLine(line = "") {
+  const text = String(line || "").trim();
+  if (!text.startsWith("[악보]")) return null;
+  const raw = text.slice(4).trim();
+  if (!raw) return null;
+  const parts = raw.split(" / ").map((value) => value.trim());
+  return {
+    title: parts[0] || "",
+    artist: parts[1] || "",
+  };
+}
+
+function renderFeedContentMarkup(content = "") {
+  const lines = String(content || "").split("\n");
+  const blocks = [];
+  let paragraphLines = [];
+
+  const flushParagraph = () => {
+    if (!paragraphLines.length) return;
+    blocks.push(`<p class="feed-post-copy">${paragraphLines.map((line) => buildFeedInlineMarkup(line)).join("<br />")}</p>`);
+    paragraphLines = [];
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const score = parseFeedScoreLine(line);
+    const nextLine = String(lines[i + 1] || "").trim();
+    if (score && /^https?:\/\//i.test(nextLine)) {
+      flushParagraph();
+      blocks.push(`
+        <a class="feed-post-score" href="${escapeHtml(nextLine)}" target="_blank" rel="noreferrer">
+          <span class="feed-post-score-label">악보</span>
+          <span class="feed-post-score-meta">
+            <strong class="feed-post-score-title">${escapeHtml(score.title || "이름 없는 악보")}</strong>
+            ${score.artist ? `<span class="feed-post-score-artist">${escapeHtml(score.artist)}</span>` : ""}
+          </span>
+        </a>
+      `);
+      i += 1;
+      continue;
+    }
+    paragraphLines.push(line);
+  }
+
+  flushParagraph();
+  return blocks.join("");
+}
+
 function createFeedPostElement(post) {
   const article = document.createElement("article");
   article.className = "feed-post feed-post-user";
@@ -184,7 +268,7 @@ function createFeedPostElement(post) {
       </div>
     </div>
     <h2 class="feed-post-title">${escapeHtml(post.title || "제목 없는 글")}</h2>
-    <p class="feed-post-copy">${escapeHtml(post.content)}</p>
+    <p class="feed-post-copy">${renderFeedContentMarkup(post.content)}</p>
     ${post.imageUrl ? `<img class="feed-post-image" alt="" src="${escapeHtml(post.imageUrl)}" />` : ""}
     ${post.linkUrl ? `<a class="feed-post-link" href="${escapeHtml(post.linkUrl)}">${(post.linkThumbnailUrl || getYoutubeThumbnailUrl(post.linkUrl)) ? `<img class="feed-post-link-thumb" alt="" src="${escapeHtml(post.linkThumbnailUrl || getYoutubeThumbnailUrl(post.linkUrl))}" />` : ""}<span class="feed-post-link-url">${escapeHtml(post.linkUrl)}</span></a>` : ""}
   `;
@@ -319,6 +403,142 @@ function renderFeedLinkPreview(url = "", title = "", linkUrl = "") {
   `;
 }
 
+function setFeedScoreStatus(message = "", isError = false) {
+  const status = $("#feedScoreStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.classList.toggle("error", !!isError);
+}
+
+function setFeedScoreEditor(open) {
+  const editor = $("#feedScoreEditor");
+  if (!editor) return;
+  editor.classList.toggle("hidden", !open);
+  if (open) {
+    requestAnimationFrame(() => $("#feedScoreInput")?.focus());
+  } else {
+    const input = $("#feedScoreInput");
+    if (input) input.value = "";
+    renderFeedScoreSuggestions([]);
+    setFeedScoreStatus("");
+  }
+}
+
+function renderFeedScoreSuggestions(items = []) {
+  const panel = $("#feedScoreSuggest");
+  if (!panel) return;
+  if (!items.length) {
+    panel.innerHTML = "";
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.innerHTML = "";
+  items.forEach((song) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "feed-score-suggest-item";
+    button.setAttribute("role", "option");
+    const meta = [song.artist, song.key].filter(Boolean).join(" · ");
+    button.innerHTML = `
+      <strong>${escapeHtml(song.title || "이름 없는 악보")}</strong>
+      <span>${escapeHtml(meta || "업로드한 악보")}</span>
+    `;
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      insertSelectedScoreLink(song);
+    });
+    panel.appendChild(button);
+  });
+  panel.classList.remove("hidden");
+}
+
+async function loadFeedScoreLibrary() {
+  if (feedScoreLibraryLoaded) return feedScoreLibrary;
+  const client = getClient();
+  let songs = [];
+  if (client) {
+    try {
+      const { data, error } = await client
+        .from("songs")
+        .select("id, title, artist, key, pdf_url, jpg_url, created_at")
+        .order("created_at", { ascending: false });
+      if (!error && Array.isArray(data)) {
+        songs = data.map((row) => ({
+          id: String(row.id || ""),
+          title: String(row.title || "").trim(),
+          artist: String(row.artist || "").trim(),
+          key: String(row.key || "").trim(),
+          fileUrl: String(row.pdf_url || row.jpg_url || "").trim(),
+          createdAt: row.created_at || "",
+        }));
+      }
+    } catch {}
+  }
+  if (!songs.length) {
+    try {
+      const response = await fetch("./songs.json", { cache: "no-store" });
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          songs = data.map((row, index) => ({
+            id: String(row.id || `song-${index + 1}`),
+            title: String(row.title || "").trim(),
+            artist: String(row.artist || "").trim(),
+            key: String(row.key || "").trim(),
+            fileUrl: String(row.pdfUrl || row.file || row.jpgUrl || "").trim(),
+            createdAt: row.createdAt || "",
+          }));
+        }
+      }
+    } catch {}
+  }
+  feedScoreLibrary = songs.filter((song) => song.id && song.title && song.fileUrl);
+  feedScoreLibraryLoaded = true;
+  return feedScoreLibrary;
+}
+
+function searchFeedScores(keyword = "") {
+  const normalizedKeyword = normalizeSearchText(keyword);
+  const chosungKeyword = normalizedKeyword.replace(/\s+/g, "");
+  const hasChosung = /[ㄱ-ㅎ]/.test(chosungKeyword);
+  const source = feedScoreLibrary;
+  if (!normalizedKeyword) return source.slice(0, 8);
+  return source.filter((song) => {
+    const title = normalizeSearchText(song.title);
+    const artist = normalizeSearchText(song.artist);
+    const key = normalizeSearchText(song.key);
+    if (title.includes(normalizedKeyword) || artist.includes(normalizedKeyword) || key.includes(normalizedKeyword)) {
+      return true;
+    }
+    if (!hasChosung) return false;
+    const chosung = `${getChosung(song.title)} ${getChosung(song.artist)}`.replace(/\s+/g, "");
+    return chosung.includes(chosungKeyword);
+  }).slice(0, 8);
+}
+
+function insertTextAtCursor(input, text) {
+  if (!input) return;
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const before = input.value.slice(0, start);
+  const after = input.value.slice(end);
+  input.value = `${before}${text}${after}`;
+  const nextCursor = start + text.length;
+  input.setSelectionRange(nextCursor, nextCursor);
+  input.focus();
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function insertSelectedScoreLink(song) {
+  const textarea = $("#feedWriteText");
+  if (!textarea || !song?.fileUrl) return;
+  const meta = [song.title, song.artist].filter(Boolean).join(" / ");
+  const prefix = textarea.value && !textarea.value.endsWith("\n") ? "\n\n" : "";
+  insertTextAtCursor(textarea, `${prefix}[악보] ${meta}\n${song.fileUrl}`);
+  setFeedScoreEditor(false);
+  setFeedWriteStatus("악보 링크를 본문에 넣었어요.");
+}
+
 function getFeedDraftPayload() {
   return {
     type: feedWriteType,
@@ -378,17 +598,21 @@ function resetFeedComposeState() {
   const textarea = $("#feedWriteText");
   const imageInput = $("#feedImageInput");
   const linkInput = $("#feedLinkInput");
+  const scoreInput = $("#feedScoreInput");
   if (subjectInput) subjectInput.value = "";
   if (textarea) textarea.value = "";
   if (imageInput) imageInput.value = "";
   if (linkInput) linkInput.value = "";
+  if (scoreInput) scoreInput.value = "";
   renderFeedImagePreview();
   renderFeedLinkPreview("", "", "");
   setFeedLinkEditor(false);
+  setFeedScoreEditor(false);
   syncFeedTypeUi();
   syncFeedWriteSubmitState();
   setFeedWriteStatus("");
   setFeedLinkStatus("");
+  setFeedScoreStatus("");
 }
 
 function applyFeedDraft(draft) {
@@ -460,9 +684,12 @@ function setFeedWriteModal(open) {
     syncFeedWriteSubmitState();
     renderFeedImagePreview();
     setFeedLinkEditor(false);
+    setFeedScoreEditor(false);
     requestAnimationFrame(() => $("#feedWriteSubject")?.focus());
   } else {
     setFeedTypeMenu(false);
+    setFeedLinkEditor(false);
+    setFeedScoreEditor(false);
     setFeedWriteStatus("");
   }
 }
@@ -659,7 +886,20 @@ function bindFeedCompose() {
     if (input) input.value = feedWriteLinkUrl;
     renderFeedLinkPreview(feedWriteLinkThumbnailUrl, feedWriteLinkTitle, feedWriteLinkUrl);
     setFeedLinkStatus("");
+    setFeedScoreEditor(false);
     setFeedLinkEditor(true);
+  });
+
+  $("#feedScorePickerBtn")?.addEventListener("click", async () => {
+    setFeedLinkEditor(false);
+    setFeedScoreStatus("");
+    setFeedScoreEditor(true);
+    const songs = await loadFeedScoreLibrary();
+    if (!songs.length) {
+      setFeedScoreStatus("불러올 수 있는 악보가 아직 없어요.", true);
+      return;
+    }
+    renderFeedScoreSuggestions(searchFeedScores($("#feedScoreInput")?.value || ""));
   });
 
   $("#feedLinkInput")?.addEventListener("input", (event) => {
@@ -686,6 +926,21 @@ function bindFeedCompose() {
     renderFeedLinkPreview("", "", "");
     setFeedLinkStatus("");
     setFeedLinkEditor(false);
+  });
+
+  $("#feedScoreInput")?.addEventListener("input", async (event) => {
+    await loadFeedScoreLibrary();
+    setFeedScoreStatus("");
+    renderFeedScoreSuggestions(searchFeedScores(event.currentTarget?.value || ""));
+  });
+
+  $("#feedScoreInput")?.addEventListener("focus", async (event) => {
+    await loadFeedScoreLibrary();
+    renderFeedScoreSuggestions(searchFeedScores(event.currentTarget?.value || ""));
+  });
+
+  $("#feedScoreCancelBtn")?.addEventListener("click", () => {
+    setFeedScoreEditor(false);
   });
 
   $("#feedWriteSubmit")?.addEventListener("click", () => {
@@ -726,6 +981,14 @@ function bindFeedCompose() {
     if (menu.classList.contains("hidden")) return;
     if (menu.contains(event.target) || trigger.contains(event.target)) return;
     setFeedTypeMenu(false);
+  });
+
+  document.addEventListener("click", (event) => {
+    const editor = $("#feedScoreEditor");
+    const trigger = $("#feedScorePickerBtn");
+    if (!editor || !trigger || editor.classList.contains("hidden")) return;
+    if (editor.contains(event.target) || trigger.contains(event.target)) return;
+    setFeedScoreEditor(false);
   });
 }
 

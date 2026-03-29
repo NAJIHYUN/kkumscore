@@ -113,100 +113,6 @@ function setupContactAdmin() {
   });
 }
 
-function setupPasswordPeek() {
-  const pw = $("#authPassword");
-  if (!pw) return;
-  let real = "";
-  pw.type = "text";
-  pw.autocapitalize = "off";
-  pw.autocomplete = "off";
-  pw.spellcheck = false;
-
-  function render(showLast = true) {
-    pw.dataset.realPassword = real;
-    if (!real) {
-      pw.value = "";
-      return;
-    }
-    if (!showLast) {
-      pw.value = "•".repeat(real.length);
-      return;
-    }
-    pw.value = real.length === 1 ? real : `${"•".repeat(real.length - 1)}${real.slice(-1)}`;
-  }
-
-  function placeCaretEnd() {
-    try {
-      const end = pw.value.length;
-      pw.setSelectionRange(end, end);
-    } catch {}
-  }
-
-  function clearAll() {
-    real = "";
-    pw.dataset.realPassword = "";
-    pw.value = "";
-  }
-
-  function clearIfPending() {
-    if (pw.dataset.clearOnNextFocus === "1") {
-      clearAll();
-      pw.dataset.clearOnNextFocus = "0";
-    }
-  }
-
-  pw.addEventListener("keydown", (e) => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
-
-    if (e.key === "Backspace") {
-      e.preventDefault();
-      real = real.slice(0, -1);
-      render(true);
-      placeCaretEnd();
-      return;
-    }
-
-    if (e.key === "Delete") {
-      e.preventDefault();
-      return;
-    }
-
-    if (e.key.length === 1) {
-      e.preventDefault();
-      real += e.key;
-      render(true);
-      placeCaretEnd();
-    }
-  });
-
-  pw.addEventListener("paste", (e) => {
-    e.preventDefault();
-    const text = e.clipboardData?.getData("text") || "";
-    if (!text) return;
-    real += text;
-    render(true);
-    placeCaretEnd();
-  });
-
-  pw.addEventListener("focus", () => {
-    clearIfPending();
-    render(true);
-    placeCaretEnd();
-  });
-
-  pw.addEventListener("click", () => {
-    clearIfPending();
-    placeCaretEnd();
-  });
-
-  pw.addEventListener("blur", () => {
-    render(false);
-    // 입력창을 벗어났다가 다시 들어올 때는 새로 입력하도록 초기화 예약
-    if (real.length > 0) pw.dataset.clearOnNextFocus = "1";
-  });
-  render(false);
-}
-
 async function getMyProfile(client, userId) {
   const { data, error } = await client
     .from("profiles")
@@ -446,7 +352,7 @@ async function initAuth() {
 
   btnSubmitIn?.addEventListener("click", () => withPending(async () => {
     const email = String(emailInput?.value || "").trim();
-    const password = String(pwInput?.dataset.realPassword || pwInput?.value || "");
+    const password = String(pwInput?.value || "");
     if (!email && !password) {
       setStatus("이메일과 비밀번호를 입력해 주세요.", true);
       return;
@@ -466,7 +372,6 @@ async function initAuth() {
 
     const emailExists = await isRegisteredEmail(client, email);
     if (emailExists === false) {
-      if (pwInput) pwInput.dataset.clearOnNextFocus = "1";
       setStatus("가입되지 않은 이메일 주소입니다.", true);
       return;
     }
@@ -478,9 +383,6 @@ async function initAuth() {
         loginErrorMessage = emailExists === true
           ? "비밀번호가 올바르지 않습니다."
           : "이메일 또는 비밀번호가 올바르지 않습니다.";
-      }
-      if (pwInput) {
-        pwInput.dataset.clearOnNextFocus = "1";
       }
       setStatus(loginErrorMessage, true);
       return;
@@ -495,7 +397,7 @@ async function initAuth() {
   btnSubmitUp?.addEventListener("click", () => withPending(async () => {
     const nickname = String(nicknameInput?.value || "").trim();
     const email = String(emailInput?.value || "").trim();
-    const password = String(pwInput?.dataset.realPassword || pwInput?.value || "");
+    const password = String(pwInput?.value || "");
     const passwordConfirm = String(pwConfirmInput?.value || "").trim();
     const role = "all";
     const nicknameErr = validateNickname(nickname);
@@ -553,7 +455,6 @@ async function initAuth() {
 
 document.addEventListener("DOMContentLoaded", () => {
   setupContactAdmin();
-  setupPasswordPeek();
   initAuth().catch((err) => {
     console.error(err);
     setStatus("인증 초기화 중 오류가 발생했습니다.", true);

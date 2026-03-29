@@ -81,6 +81,7 @@
         <div class="feed-write-toolbar">
           <button id="feedImagePickerBtn" class="feed-write-toolbtn" type="button">사진</button>
           <button id="feedLinkPickerBtn" class="feed-write-toolbtn" type="button">링크</button>
+          <button id="feedScorePickerBtn" class="feed-write-toolbtn" type="button">악보</button>
         </div>
         <div id="feedLinkEditor" class="feed-link-editor hidden">
           <label class="add-label feed-link-label" for="feedLinkInput">
@@ -91,6 +92,16 @@
             <button id="feedLinkCancelBtn" class="btn" type="button">링크 삭제</button>
           </div>
           <div id="feedLinkStatus" class="myinfo-status"></div>
+        </div>
+        <div id="feedScoreEditor" class="feed-link-editor hidden">
+          <label class="add-label feed-link-label" for="feedScoreInput">
+            <input id="feedScoreInput" class="input" type="text" placeholder="악보 제목이나 아티스트를 검색해보세요" autocomplete="off" />
+          </label>
+          <div id="feedScoreSuggest" class="feed-score-suggest hidden" role="listbox" aria-label="악보 검색 결과"></div>
+          <div class="feed-link-actions">
+            <button id="feedScoreCancelBtn" class="btn" type="button">닫기</button>
+          </div>
+          <div id="feedScoreStatus" class="myinfo-status"></div>
         </div>
         <div id="feedWriteStatus" class="myinfo-status"></div>
       </div>

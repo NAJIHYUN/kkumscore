@@ -4414,8 +4414,8 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
   html[data-ui-theme="dark"] .feed-link-preview,
   html[data-ui-theme="dark"] .feed-score-suggest-item,
   html[data-ui-theme="dark"] .feed-post-score{
-    background:#191f28;
     border-color:#333d4b;
+    background-color: #020913;
     color:#f2f4f6;
   }
   html[data-ui-theme="dark"] .feed-post-link-url{
@@ -4439,8 +4439,6 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
       linear-gradient(180deg, #020913 0%, #07111d 38%, #09131f 100%);
   }
   html[data-ui-theme="dark"] .feed-page .feed-post{
-    background:rgba(10,18,30,.78);
-    border-color:#191f28;
     box-shadow:0 22px 44px rgba(0,0,0,.2);
   }
   html[data-ui-theme="dark"] .feed-page .feed-post-copy,
@@ -4467,7 +4465,6 @@ body[data-share].share-team-middle .page-box.selected .page-canvas{
     color:#1b2430;
   }
   html[data-ui-theme="dark"] .feed-write-textarea{
-    background:#191f28;
     border-color:#4e5968;
     color:#f2f4f6;
   }

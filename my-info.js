@@ -95,6 +95,17 @@ function setMyInfoSummary(nickname = "-", email = "-") {
   if (emailEl) emailEl.textContent = email || "-";
 }
 
+async function syncMyInfoProfileRole(client, session) {
+  const role = String(session?.user?.user_metadata?.role || "").trim().toLowerCase();
+  if (!["high", "middle", "all", "admin"].includes(role)) return;
+  try {
+    await client
+      .from("profiles")
+      .update({ role })
+      .eq("id", session.user.id);
+  } catch {}
+}
+
 function closeMyInfoAvatarCropModal() {
   $("#myInfoAvatarCropModal")?.classList.add("hidden");
 }
@@ -439,7 +450,9 @@ async function renderSongs(userId, query = "") {
   });
 }
 
-async function saveProfileImage(client, userId, file) {
+async function saveProfileImage(client, session, file) {
+  const userId = String(session?.user?.id || "").trim();
+  if (!userId) throw new Error("사용자 정보를 확인할 수 없습니다.");
   const extension = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg";
   const filePath = `${userId}/profile-${Date.now()}.${extension}`;
   const { error: uploadError } = await client.storage
@@ -455,6 +468,8 @@ async function saveProfileImage(client, userId, file) {
   const imageUrl = String(data?.publicUrl || "").trim();
   if (!imageUrl) throw new Error("프로필 이미지 URL을 만들지 못했습니다.");
 
+  await syncMyInfoProfileRole(client, session);
+
   const { error: profileError } = await client
     .from("profiles")
     .update({ avatar_image_url: imageUrl })
@@ -462,12 +477,19 @@ async function saveProfileImage(client, userId, file) {
   if (profileError) throw profileError;
 
   try {
-    const { error: feedError } = await client
+    const { data: syncedPosts, error: feedError } = await client
       .from("feed_posts")
       .update({ author_avatar_image_url: imageUrl })
-      .eq("owner_id", userId);
+      .eq("owner_id", userId)
+      .select("id, author_avatar_image_url");
     if (feedError) {
       console.warn("feed avatar sync skipped:", feedError);
+    }
+    if (Array.isArray(syncedPosts) && syncedPosts.length) {
+      const hasMismatch = syncedPosts.some((post) => String(post?.author_avatar_image_url || "").trim() !== imageUrl);
+      if (hasMismatch) {
+        console.warn("feed avatar sync returned mismatched rows");
+      }
     }
   } catch (error) {
     console.warn("feed avatar sync skipped:", error);
@@ -582,7 +604,7 @@ async function init() {
     try {
       const blob = await createMyInfoAvatarCroppedBlob();
       const uploadFile = new File([blob], `profile-${Date.now()}.jpg`, { type: "image/jpeg" });
-      avatarImageUrl = await saveProfileImage(client, userId, uploadFile);
+      avatarImageUrl = await saveProfileImage(client, session, uploadFile);
       setMyInfoAvatar(avatarImageUrl, getAvatarSeed());
       setMyInfoStatus("프로필 사진이 저장되었습니다.");
       closeMyInfoAvatarCropModal();

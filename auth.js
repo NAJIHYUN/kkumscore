@@ -135,7 +135,7 @@ async function ensureApprovedOrSignOut(client, session) {
 
 async function syncProfileRole(client, session) {
   const role = String(session?.user?.user_metadata?.role || "").trim().toLowerCase();
-  if (!["high", "middle", "all"].includes(role)) return;
+  if (!["high", "middle", "all", "admin"].includes(role)) return;
   try {
     await client
       .from("profiles")
